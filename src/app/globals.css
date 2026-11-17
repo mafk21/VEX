@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #06080c;
+  --color-panel: #0c1017;
+  --color-panel-2: #11161f;
+  --color-line: #1d2530;
+  --color-ink: #d7dee8;
+  --color-ink-dim: #7d8794;
+  --color-accent: #2ee6a8;
+  --color-accent-ink: #06231a;
+  --color-warn: #f5b83d;
+  --color-danger: #f0564d;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+
+::selection {
+  background: rgba(46, 230, 168, 0.25);
+}
+
+/* Subtle radar-grid backdrop for the hero */
+.vex-grid {
+  background-image:
+    linear-gradient(rgba(46, 230, 168, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 230, 168, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, black, transparent);
+}

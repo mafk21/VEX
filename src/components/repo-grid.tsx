@@ -1,0 +1,166 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+interface Repo {
+  id: number;
+  name: string;
+  fullName: string;
+  description: string | null;
+  language: string | null;
+  private: boolean;
+  defaultBranch: string;
+  updatedAt: string;
+  htmlUrl: string;
+}
+
+const LANG_COLORS: Record<string, string> = {
+  TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572A5", Go: "#00ADD8",
+  Rust: "#dea584", Ruby: "#701516", Java: "#b07219", C: "#9b9b9b", "C++": "#f34b7d",
+  "C#": "#178600", PHP: "#4F5D95", Swift: "#F05138", Kotlin: "#A97BFF", Dart: "#00B4AB",
+  HTML: "#e34c26", CSS: "#563d7c", Shell: "#89e051", Vue: "#41b883", Svelte: "#ff3e00",
+};
+
+function timeAgo(iso: string): string {
+  if (!iso) return "";
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+export default function RepoGrid() {
+  const [repos, setRepos] = useState<Repo[] | null>(null);
+  const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const load = useCallback(async (refresh: boolean) => {
+    if (refresh) setRefreshing(true);
+    setError("");
+    try {
+      const res = await fetch(refresh ? "/api/repos?refresh=1" : "/api/repos");
+      const data = await res.json();
+      if (data.ok) {
+        setRepos(data.repos);
+        setWarning(data.warning ?? "");
+      } else {
+        setError(data.error ?? "Failed to load repositories.");
+      }
+    } catch {
+      setError("Could not reach the local VEX server.");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load(false);
+  }, [load]);
+
+  const filtered = (repos ?? []).filter(
+    (r) =>
+      r.fullName.toLowerCase().includes(query.toLowerCase()) ||
+      (r.description ?? "").toLowerCase().includes(query.toLowerCase()),
+  );
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-3">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter repositories…"
+          className="w-72 rounded-lg border border-line bg-panel px-4 py-2 text-sm outline-none placeholder:text-ink-dim/50 focus:border-accent/60"
+        />
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="rounded-lg border border-line bg-panel px-4 py-2 font-mono text-xs text-ink-dim transition hover:border-accent/50 hover:text-accent disabled:opacity-40"
+        >
+          {refreshing ? "refreshing…" : "↻ refresh"}
+        </button>
+        {repos && (
+          <span className="font-mono text-xs text-ink-dim">
+            {filtered.length} / {repos.length} repos
+          </span>
+        )}
+      </div>
+
+      {warning && (
+        <p className="mt-4 rounded-lg border border-warn/30 bg-warn/5 px-4 py-2 text-xs text-warn">⚠ {warning}</p>
+      )}
+      {error && (
+        <div className="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+          ✕ {error}
+          <button onClick={() => load(true)} className="ml-3 underline underline-offset-2">retry</button>
+        </div>
+      )}
+
+      {!repos && !error && (
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 animate-pulse rounded-xl border border-line bg-panel" />
+          ))}
+        </div>
+      )}
+
+      {repos && filtered.length === 0 && (
+        <p className="mt-10 text-center text-sm text-ink-dim">
+          {repos.length === 0 ? "No repositories found for this token." : "No repositories match your filter."}
+        </p>
+      )}
+
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {filtered.map((r) => (
+          <div
+            key={r.id}
+            className="group flex flex-col rounded-xl border border-line bg-panel p-5 transition hover:border-accent/40"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <a
+                href={r.htmlUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-sm font-bold text-ink group-hover:text-accent"
+              >
+                {r.fullName}
+              </a>
+              <span className="shrink-0 rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-ink-dim">
+                {r.private ? "🔒 private" : "public"}
+              </span>
+            </div>
+
+            <p className="mt-2 line-clamp-2 min-h-8 text-xs leading-relaxed text-ink-dim">
+              {r.description ?? "No description."}
+            </p>
+
+            <div className="mt-3 flex items-center gap-3 font-mono text-[11px] text-ink-dim">
+              {r.language && (
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: LANG_COLORS[r.language] ?? "#7d8794" }}
+                  />
+                  {r.language}
+                </span>
+              )}
+              <span>⑂ {r.defaultBranch}</span>
+              <span className="ml-auto">{timeAgo(r.updatedAt)}</span>
+            </div>
+
+            <button
+              disabled
+              title="The scan engine arrives in Sprint 2"
+              className="mt-4 w-full cursor-not-allowed rounded-lg border border-line bg-panel-2 py-2 font-mono text-xs text-ink-dim/60"
+            >
+              ⌖ hunt — coming in Sprint 2
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
