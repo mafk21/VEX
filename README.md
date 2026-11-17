@@ -28,10 +28,13 @@ Then open the app and connect:
 
 Data lives in `~/.vex/` by default (override with `VEX_DATA_DIR`).
 
+> **Dev/demo without a Gemini key:** run with `VEX_MOCK_GEMINI=1` to exercise the full
+> scan pipeline with canned findings (clearly labeled `[MOCK]` in the report).
+
 ## Status
 
 - [x] **Sprint 1** — local foundation, GitHub + Gemini connections, repo browser
-- [ ] **Sprint 2** — scan engine (chunked Gemini analysis pipeline)
+- [x] **Sprint 2** — scan engine (chunked Gemini analysis pipeline)
 - [ ] **Sprint 3** — findings report UI
 - [ ] **Sprint 4** — deep scan, export, hardening
 

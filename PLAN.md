@@ -126,20 +126,22 @@ key → sees their repos.
 
 **Done when:** a fresh clone runs locally end-to-end: connect both keys, browse repos.
 
-## Sprint 2 — Scan Engine (50%)
+## Sprint 2 — Scan Engine (50%) ✅
 
 **Goal:** end-to-end local pipeline from "pick a repo" to findings rows in SQLite.
 
-- [ ] Repo file-tree fetch via GitHub API (git trees endpoint)
-- [ ] File filtering & prioritization: skip binaries, lockfiles, `node_modules`,
+- [x] Repo file-tree fetch via GitHub API (git trees endpoint, BFS fallback for truncated trees)
+- [x] File filtering & prioritization: skip binaries, lockfiles, `node_modules`,
       generated/minified code, assets; rank by language and path importance
-- [ ] Token-budget packer: group files into chunks ≤ budget, line-number the content
-- [ ] Scan prompt: security/bug/logic/quality hunting instructions + schema
-- [ ] Gemini service: Flash call with structured output, retry/backoff on 429
-- [ ] In-process background worker: sequential chunk queue, ~12 RPM throttle,
+- [x] Token-budget packer: group files into chunks ≤ budget, line-number the content
+- [x] Scan prompt: security/bug/logic/quality hunting instructions + schema
+- [x] Gemini service: Flash call with structured output, retry/backoff on 429
+- [x] In-process background worker: sequential chunk queue, ~12 RPM throttle,
       resumable after app restart, cancellable
-- [ ] Findings writer: dedupe, persist to SQLite
-- [ ] Scan status machine + error capture (quota exceeded, GitHub errors, huge repos)
+- [x] Findings writer: dedupe, persist to SQLite
+- [x] Scan status machine + error capture (quota exceeded, GitHub errors, huge repos)
+- [x] Minimal live scan-status page (progress, cancel, raw findings) + hunt button on repo cards
+- [x] `VEX_MOCK_GEMINI=1` mock mode for offline dev/demo
 
 **Done when:** scanning a real repo produces structured findings in the local DB,
 resilient to rate limits, with live progress readable from the scan record.
