@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+
+# VEX local data (keys, SQLite db, caches) — never commit
+.vex/
+
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
