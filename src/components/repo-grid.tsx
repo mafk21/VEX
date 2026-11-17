@@ -36,6 +36,32 @@ export default function RepoGrid() {
   const [warning, setWarning] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
+  const [starting, setStarting] = useState<number | null>(null);
+  const [startError, setStartError] = useState("");
+
+  async function startHunt(repo: Repo) {
+    setStarting(repo.id);
+    setStartError("");
+    try {
+      const res = await fetch("/api/scans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoFullName: repo.fullName }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        window.location.href = `/scans/${data.scanId}`;
+      } else if (res.status === 409 && data.scanId) {
+        window.location.href = `/scans/${data.scanId}`;
+      } else {
+        setStartError(data.error ?? "Failed to start the scan.");
+      }
+    } catch {
+      setStartError("Could not reach the local VEX server.");
+    } finally {
+      setStarting(null);
+    }
+  }
 
   const load = useCallback(async (refresh: boolean) => {
     if (refresh) setRefreshing(true);
@@ -91,6 +117,9 @@ export default function RepoGrid() {
 
       {warning && (
         <p className="mt-4 rounded-lg border border-warn/30 bg-warn/5 px-4 py-2 text-xs text-warn">⚠ {warning}</p>
+      )}
+      {startError && (
+        <p className="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-4 py-2 text-xs text-danger">✕ {startError}</p>
       )}
       {error && (
         <div className="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
@@ -152,11 +181,11 @@ export default function RepoGrid() {
             </div>
 
             <button
-              disabled
-              title="The scan engine arrives in Sprint 2"
-              className="mt-4 w-full cursor-not-allowed rounded-lg border border-line bg-panel-2 py-2 font-mono text-xs text-ink-dim/60"
+              onClick={() => startHunt(r)}
+              disabled={starting !== null}
+              className="mt-4 w-full rounded-lg border border-accent/40 bg-accent/10 py-2 font-mono text-xs font-bold text-accent transition hover:bg-accent/20 disabled:opacity-40"
             >
-              ⌖ hunt — coming in Sprint 2
+              {starting === r.id ? "starting…" : "⌖ hunt this repo"}
             </button>
           </div>
         ))}
