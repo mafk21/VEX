@@ -1,6 +1,6 @@
 {
   "name": "vex",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "VEX — local-first AI code hunter for your GitHub repos, powered by your own Gemini key.",
   "author": "mafk21 (https://github.com/mafk21)",
@@ -26,7 +26,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
+    "start": "next build && next start --hostname 127.0.0.1",
     "test": "node --no-warnings --test tests/*.test.ts"
   },
   "engines": {

@@ -27,7 +27,8 @@ Open http://localhost:3000, connect your token + key, and you're in.
 ### Demo without a Gemini key
 
 ```bash
-VEX_MOCK_GEMINI=1 npm run dev
+VEX_MOCK_GEMINI=1 npm run dev       # macOS/Linux
+$env:VEX_MOCK_GEMINI="1"; npm run dev   # Windows PowerShell
 ```
 
 Mock mode runs the entire pipeline (tree fetch → filtering → chunking → worker →

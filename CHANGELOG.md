@@ -3,6 +3,15 @@
 All notable changes to VEX are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] — 2026-11-18
+
+### Fixed
+- **Windows support**: `npm start` no longer uses bash-only `${PORT:-3000}`
+  syntax (broke on PowerShell/cmd). Custom ports still work via the `PORT`
+  env var on all platforms.
+- `npm start` now builds before serving, so a fresh clone works with a single
+  command as the README promises.
+
 ## [1.0.0] — 2026-11-18
 
 First public release.
