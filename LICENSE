@@ -1,0 +1,70 @@
+VEX Personal-Use License (Source-Available)
+Version 1.0 — 18 November 2026
+
+Copyright (c) 2026 mafk21 and VEX contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to run
+the Software on devices they own or control for personal, non-commercial
+purposes, subject to the conditions below.
+
+1. PERSONAL USE ONLY. You may install, run, read, study, and modify the
+   Software on devices you own or control, for your own personal use. The
+   Software is a local-first tool: it is designed to run entirely on your
+   own machine, and this License grants you the right to do exactly that —
+   nothing more.
+
+2. AUTHORIZED SCANNING ONLY. The Software analyzes source code with the help
+   of third-party AI services. You may only point it at code you own, code
+   you have explicit permission to analyze, or code whose license permits
+   such analysis. The authors are not responsible for how you use the
+   Software or for findings it produces.
+
+3. THIRD-PARTY SERVICES. The Software talks directly from your machine to
+   GitHub and to Google's Gemini API, using credentials you supply. Your use
+   of those services — including any cost, quota, data-use, or training
+   implications of free-tier versus paid API keys — is governed solely by
+   your agreements with those providers, not by this License.
+
+4. NO REDISTRIBUTION. You may NOT publish, redistribute, republish, upload,
+   share, or otherwise distribute the Software or any modified or derivative
+   work — including via app stores, package registries, code-hosting
+   services, or as part of another project, product, or service — and you
+   may NOT present the Software or any derivative work as your own.
+
+5. NO COMMERCIAL USE. You may NOT sell, license, monetize, or offer the
+   Software or any derivative work as a paid product or service, nor
+   incorporate it into a commercial product, service, or business activity.
+
+6. NO SUBLICENSING OR TRANSFER. You may NOT sublicense, sell, assign, or
+   transfer any rights granted under this License.
+
+7. CONTRIBUTIONS. By intentionally submitting a contribution to the VEX
+   project, you agree that your contribution is licensed under this same
+   Personal-Use License and may be used, modified, and included in VEX.
+   Submitting a contribution grants you no right to publish, redistribute,
+   sublicense, sell, or separately exploit VEX or any derivative work.
+
+8. ATTRIBUTION AND NOTICES. You may NOT remove or alter copyright,
+   authorship, attribution, licensing, or other legal notices included with
+   the Software.
+
+9. TRADEMARKS. "VEX," the VEX name, its logos, and its branding may not be
+   used to imply endorsement, affiliation, or authorization, or to brand a
+   separate product, project, or service, without prior written permission
+   from the VEX maintainers.
+
+10. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY
+    KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+    NONINFRINGEMENT. FINDINGS PRODUCED BY THE SOFTWARE ARE AUTOMATED
+    ANALYSIS AND MAY CONTAIN ERRORS OR OMISSIONS; THEY ARE NOT A GUARANTEE
+    OF SECURITY OR CORRECTNESS. IN NO EVENT SHALL THE AUTHORS, COPYRIGHT
+    HOLDERS, OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+    LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR
+    THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+11. TERMINATION. Any use of the Software that violates this License
+    automatically terminates the rights granted to you under it. Upon
+    termination, you must stop using the Software and delete all copies and
+    modified or derivative versions in your possession or control.
