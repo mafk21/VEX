@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="VEX logo" width="180" />
+<img src="assets/logo.png" alt="VEX logo" width="650" />
 
 # VEX
 
