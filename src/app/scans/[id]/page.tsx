@@ -1,4 +1,4 @@
-import ScanStatus from "@/components/scan-status";
+import ScanView from "@/components/scan-view";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +8,5 @@ interface Props {
 
 export default async function ScanPage({ params }: Props) {
   const { id } = await params;
-  return <ScanStatus scanId={id} />;
+  return <ScanView scanId={id} />;
 }

@@ -35,7 +35,7 @@ Data lives in `~/.vex/` by default (override with `VEX_DATA_DIR`).
 
 - [x] **Sprint 1** — local foundation, GitHub + Gemini connections, repo browser
 - [x] **Sprint 2** — scan engine (chunked Gemini analysis pipeline)
-- [ ] **Sprint 3** — findings report UI
+- [x] **Sprint 3** — findings report UI (severity dashboard, code viewer, history)
 - [ ] **Sprint 4** — deep scan, export, hardening
 
 See [PLAN.md](./PLAN.md) for the full build plan.

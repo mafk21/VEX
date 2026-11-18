@@ -168,13 +168,13 @@ async function runScan(scanId: string): Promise<void> {
         const results = await Promise.all(
           batch.map(async (f) => {
             const content = await fetchFileContent(token, scan.repoFullName, f.path, repo.defaultBranch, MAX_FILE_BYTES);
-            return content === null ? null : prepareFile(f.path, content);
+            return content === null ? null : { prepared: prepareFile(f.path, content), raw: content };
           }),
         );
         for (const r of results) {
           if (!r) continue;
-          numbered.push(r);
-          saveScanFile(scanId, r.path, r.numbered, r.lines);
+          numbered.push(r.prepared);
+          saveScanFile(scanId, r.prepared.path, r.raw, r.prepared.lines);
           filesScanned++;
         }
       }

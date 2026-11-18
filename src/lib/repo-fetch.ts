@@ -82,10 +82,16 @@ export async function fetchFileContent(
       headers: headers(token, "application/vnd.github.raw+json"),
       cache: "no-store",
     });
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = (e as { cause?: { code?: string } })?.cause?.code ?? "";
+    console.warn(`[vex] fetchFileContent ${path} threw: ${msg} ${code}`);
     return null;
   }
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.warn(`[vex] fetchFileContent ${path} -> HTTP ${res.status}`);
+    return null;
+  }
 
   const buf = await res.arrayBuffer();
   if (buf.byteLength === 0 || buf.byteLength > maxBytes) return null;

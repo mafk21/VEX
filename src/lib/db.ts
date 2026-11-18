@@ -291,6 +291,20 @@ export function getScanFileLines(scanId: string): Map<string, number> {
   return new Map(rows.map((r) => [r.path, r.lines]));
 }
 
+export function getScanFile(scanId: string, path: string): { path: string; content: string; lines: number } | null {
+  const r = getDb().prepare("SELECT path, content, lines FROM scan_files WHERE scan_id = ? AND path = ?").get(scanId, path) as
+    | { path: string; content: string; lines: number }
+    | undefined;
+  return r ?? null;
+}
+
+export function getRunningChunk(scanId: string): ChunkRow | null {
+  const r = getDb()
+    .prepare("SELECT * FROM scan_chunks WHERE scan_id = ? AND status = 'running' ORDER BY idx LIMIT 1")
+    .get(scanId) as Record<string, unknown> | undefined;
+  return r ? rowToChunk(r) : null;
+}
+
 /* ── findings ────────────────────────────────────────────────────────────── */
 
 export interface FindingInput {
