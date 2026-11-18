@@ -1,0 +1,24 @@
+name: 💡 Feature request
+description: Suggest an idea for VEX
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the friction or gap, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work?
+  - type: checkboxes
+    id: local-first
+    attributes:
+      label: Local-first check
+      description: VEX is local-first — no accounts, no telemetry, no extra cloud services.
+      options:
+        - label: This feature works without adding any server-side component or third-party service
+          required: true

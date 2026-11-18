@@ -9,6 +9,7 @@
 [![License: Source-Available (Personal Use)](https://img.shields.io/badge/license-source--available-red)](./LICENSE)
 [![Node ≥ 22.5](https://img.shields.io/badge/node-%E2%89%A5%2022.5-339933)](https://nodejs.org)
 [![Local-first](https://img.shields.io/badge/local--first-no%20telemetry-2ee6a8)](#why-local-first)
+[![CI](https://github.com/mafk21/VEX/actions/workflows/ci.yml/badge.svg)](https://github.com/mafk21/VEX/actions/workflows/ci.yml)
 [![Code of Conduct](https://img.shields.io/badge/code%20of%20conduct-contributor%20covenant-9cf)](./CODE_OF_CONDUCT.md)
 
 </div>
@@ -117,6 +118,8 @@ See [PLAN.md](./PLAN.md) for the full build plan and roadmap
 
 - [Contributing guide](./CONTRIBUTING.md) — setup, tests, PR process
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security policy](./SECURITY.md) — how to report a vulnerability privately
+- [Changelog](./CHANGELOG.md)
 
 ## License
 
