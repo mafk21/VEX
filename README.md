@@ -1,41 +1,99 @@
-# VEX
+# VEX ⌖
 
 **VEX is a local-first AI code hunter.** Connect your GitHub account and your own
 Gemini API key, pick a repo, and VEX hunts the code for bugs, vulnerabilities,
-logic-flow breaks, and quality issues — then shows you exactly where and how to fix them.
+logic-flow breaks, and quality issues — then shows you exactly where each problem
+lives and how to fix it.
 
-Everything runs on **your machine**: keys are encrypted in a local config file
-(`0600`), findings live in a local SQLite database, and the only outbound traffic is
-direct from your device to GitHub and to Google's Gemini API. No accounts, no cloud
-database, no telemetry.
+## Why local-first?
 
-## Quick start
+Your code and keys are the most sensitive things you own. So VEX has **no server
+side at all**:
 
-```bash
-npm install
-npm run dev        # http://localhost:3000  (dev)
-# or
-npm run build && npm start   # production, binds to 127.0.0.1 only
+```
+┌─────────────────────────── YOUR MACHINE ───────────────────────────┐
+│  Browser (127.0.0.1 UI)                                            │
+│     │                                                              │
+│     ▼                                                              │
+│  Local Next.js server                                              │
+│     ├── ~/.vex/config.json   keys, AES-256-GCM encrypted, mode 600 │
+│     ├── .vex/vex.db (SQLite) scans, findings, source cache         │
+│     └── scan worker (background queue, ~12 Gemini calls/min)       │
+│           │                              │                         │
+└───────────┼──────────────────────────────┼─────────────────────────┘
+            ▼                              ▼
+      api.github.com              generativelanguage.googleapis.com
+      (your PAT, read-only)       (your own key, your quota)
 ```
 
-Then open the app and connect:
+- **No accounts, no telemetry, no cloud database.** Uninstall = delete the folder.
+- Keys are encrypted at rest with a machine-derived key and never leave your device.
+- The only outbound traffic is direct from your machine to GitHub and Google.
+- ⚠️ **Free-tier Gemini keys** may allow Google to use prompts (your code) for
+  training — the app asks you to acknowledge this at setup. Paid-tier keys are
+  not used for training. Use a paid key for sensitive private repos.
 
-1. **GitHub token** — [github.com/settings/tokens](https://github.com/settings/tokens?type=beta)
-   → fine-grained token with **Contents: Read-only** (classic PAT with `repo` scope also works).
-2. **Gemini API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
-   The free tier works; note that Google may use free-tier prompts for training
-   (you'll be asked to acknowledge this in the app).
+## Quick start (under 5 minutes)
 
-Data lives in `~/.vex/` by default (override with `VEX_DATA_DIR`).
+Requires **Node.js ≥ 22.5** (uses the built-in SQLite module).
 
-> **Dev/demo without a Gemini key:** run with `VEX_MOCK_GEMINI=1` to exercise the full
-> scan pipeline with canned findings (clearly labeled `[MOCK]` in the report).
+```bash
+git clone <this-repo> && cd VEX
+npm install
+npm start          # builds & serves on http://127.0.0.1:3000
+# or: npm run dev  # development mode
+```
+
+Then open http://localhost:3000 and connect:
+
+### 1. GitHub token
+Go to [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
+→ **Generate new token** (fine-grained) → Repository access: *All repositories* (or
+pick some) → Permissions → **Contents: Read-only** → Generate. That's the only
+permission VEX needs. (A classic PAT with the `repo` scope also works.)
+
+### 2. Gemini API key
+Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) →
+**Create API key**. The free tier works fine (~1,500 requests/day; a scan uses
+roughly one request per ~120K tokens of code).
+
+### 3. Hunt
+Pick a repo on the dashboard → **⌖ hunt**. Watch the live progress, then browse
+the report: severity dashboard, category filters, syntax-highlighted code context
+with the flagged lines, and a concrete suggested fix per finding.
+
+## Scan modes
+
+| Mode | Model | Best for |
+|---|---|---|
+| **⌖ hunt** (quick) | Gemini Flash, 1M-token context | Everyday scans; works on free keys |
+| **deep** | Gemini Pro + extended reasoning, smaller chunks | Thorough audits; needs a paid-tier key |
+
+## Reports & data
+
+- **Export** any scan as Markdown or JSON from the scan page (`↓ md` / `↓ json`).
+- **History** lives at `/scans`; the dashboard shows each repo's last hunt.
+- **Privacy controls** live at `/settings`: disconnect keys, or wipe *everything*
+  (keys + full scan history) with one click.
+- Scans are **cancellable** and **resumable** — close the app mid-hunt and it picks
+  up where it left off on next start.
+
+## Dev notes
+
+```bash
+npm test                    # unit tests (node:test, type-stripped TS)
+VEX_MOCK_GEMINI=1 npm run dev   # demo the full pipeline without a Gemini key
+PORT=8080 npm start         # custom port
+```
+
+Data directory: `~/.vex` by default; override with `VEX_DATA_DIR=/path/to/dir`.
 
 ## Status
 
 - [x] **Sprint 1** — local foundation, GitHub + Gemini connections, repo browser
 - [x] **Sprint 2** — scan engine (chunked Gemini analysis pipeline)
 - [x] **Sprint 3** — findings report UI (severity dashboard, code viewer, history)
-- [ ] **Sprint 4** — deep scan, export, hardening
+- [x] **Sprint 4** — deep scan, export, privacy controls, hardening, tests
 
-See [PLAN.md](./PLAN.md) for the full build plan.
+See [PLAN.md](./PLAN.md) for the full build plan and roadmap
+(stretch: `npx vex` package, Tauri desktop wrapper).

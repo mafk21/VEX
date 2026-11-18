@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 });
   }
   const repoFullName = typeof body.repoFullName === "string" ? body.repoFullName : "";
+  const mode = body.mode === "deep" ? ("deep" as const) : ("quick" as const);
   if (!repoFullName) {
     return NextResponse.json({ ok: false, error: "Missing repoFullName." }, { status: 400 });
   }
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "A scan is already running for this repo.", scanId: active.id }, { status: 409 });
   }
 
-  const result = await startScan(repoFullName);
+  const result = await startScan(repoFullName, mode);
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   }

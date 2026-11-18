@@ -161,21 +161,22 @@ resilient to rate limits, with live progress readable from the scan record.
 
 **Done when:** run a scan → browse a clean, useful report with code context and fixes.
 
-## Sprint 4 — Polish, Deep Scan & Ship (100%)
+## Sprint 4 — Polish, Deep Scan & Ship (100%) ✅
 
-- [ ] Deep Scan mode: detect paid-tier key → Pro model + thinking budget; clear
-      explanation for free keys
-- [ ] Rate-limit UX: queue position, ETA, "free tier daily quota hit — resets
-      midnight PT" messaging
-- [ ] Local export: report → Markdown/JSON file on disk
-- [ ] Privacy controls: one-click "delete all my data", key rotation
-- [ ] Hardening: error boundaries, input validation, port-in-use handling,
-      graceful Ctrl+C shutdown
-- [ ] README: privacy architecture, setup guide (PAT creation walkthrough,
-      Gemini key walkthrough), screenshots
-- [ ] Final test matrix: small repo, large repo, private repo, free key, paid key,
-      quota exhaustion, offline behavior
-- [ ] Stretch: npm global package (`npx vex`), Tauri desktop wrapper
+- [x] Deep Scan mode: Pro model + 8K thinking budget + smaller (60K-token) chunks;
+      pre-flight probe fails fast with a clear message on free-tier keys
+- [x] Rate-limit UX: live ETA, throttle notice, daily-quota error messaging
+      ("resets midnight PT")
+- [x] Local export: report → Markdown/JSON download (`/api/scans/:id/export`)
+- [x] Privacy controls: /settings page — disconnect keys, one-click full data wipe
+      (`DELETE /api/data`)
+- [x] Hardening: error boundary + 404 pages, graceful SIGINT/SIGTERM shutdown,
+      port override via `PORT`
+- [x] Unit tests: 15 tests (filter, packer, findings parser) via `node --test`
+- [x] README: privacy architecture, setup walkthroughs, scan modes, dev notes
+- [x] Test matrix: small repo, large repo (442 files / 9 chunks), private repo,
+      deep-scan rejection on flash-only key, export, wipe, offline-cache fallback
+- [ ] Stretch: npm global package (`npx vex`), Tauri desktop wrapper — future
 
 **Done when:** any developer can clone, run, and hunt bugs in their repo in <5 minutes,
 with their data never leaving their machine.

@@ -52,14 +52,14 @@ export default function RepoGrid() {
       .catch(() => {});
   }, []);
 
-  async function startHunt(repo: Repo) {
+  async function startHunt(repo: Repo, mode: "quick" | "deep" = "quick") {
     setStarting(repo.id);
     setStartError("");
     try {
       const res = await fetch("/api/scans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoFullName: repo.fullName }),
+        body: JSON.stringify({ repoFullName: repo.fullName, mode }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -210,13 +210,23 @@ export default function RepoGrid() {
               </a>
             )}
 
-            <button
-              onClick={() => startHunt(r)}
-              disabled={starting !== null}
-              className="mt-4 w-full rounded-lg border border-accent/40 bg-accent/10 py-2 font-mono text-xs font-bold text-accent transition hover:bg-accent/20 disabled:opacity-40"
-            >
-              {starting === r.id ? "starting…" : "⌖ hunt this repo"}
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => startHunt(r, "quick")}
+                disabled={starting !== null}
+                className="flex-1 rounded-lg border border-accent/40 bg-accent/10 py-2 font-mono text-xs font-bold text-accent transition hover:bg-accent/20 disabled:opacity-40"
+              >
+                {starting === r.id ? "starting…" : "⌖ hunt"}
+              </button>
+              <button
+                onClick={() => startHunt(r, "deep")}
+                disabled={starting !== null}
+                title="Deep scan — Gemini Pro + extended reasoning over smaller chunks. Needs a paid-tier key."
+                className="rounded-lg border border-line bg-panel-2 px-3 py-2 font-mono text-xs text-ink-dim transition hover:border-accent/50 hover:text-accent disabled:opacity-40"
+              >
+                deep
+              </button>
+            </div>
           </div>
         ))}
       </div>

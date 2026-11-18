@@ -7,9 +7,12 @@ import {
 } from "./db";
 import { fetchRepoTree, fetchFileContent } from "./repo-fetch";
 import { filterTree, MAX_FILE_BYTES } from "./filter";
-import { planChunks } from "./packer";
+import { planChunks, CHUNK_TOKEN_BUDGET } from "./packer";
+
+/** Deep scans reason harder over smaller chunks. */
+const DEEP_CHUNK_TOKEN_BUDGET = 60_000;
 import { buildScanPrompt, prepareFile, FINDINGS_RESPONSE_SCHEMA, type NumberedFile } from "./prompt";
-import { callGeminiForFindings, pickModel, type RawFinding } from "./gemini";
+import { callGeminiForFindings, pickModel, pickProModel, probeModel, type RawFinding } from "./gemini";
 
 /**
  * In-process scan worker. Because VEX runs locally (no serverless timeouts),
@@ -45,14 +48,24 @@ async function throttleGemini(): Promise<void> {
 export type StartResult = { ok: true; scanId: string } | { ok: false; error: string };
 
 export async function startScan(repoFullName: string, mode: "quick" | "deep" = "quick"): Promise<StartResult> {
+  const geminiKey = getGeminiKey();
   if (!getGitHubToken()) return { ok: false, error: "GitHub is not connected." };
-  if (!getGeminiKey()) return { ok: false, error: "Gemini is not connected." };
+  if (!geminiKey) return { ok: false, error: "Gemini is not connected." };
 
   const repo = getCachedRepo(repoFullName);
   if (!repo) return { ok: false, error: `Unknown repository: ${repoFullName}. Refresh the repo list.` };
 
   const models = readConfig().geminiModels ?? [];
-  const model: string = pickModel(models); // deep-scan (Pro) mode lands in Sprint 4
+  const deep = mode === "deep";
+  const model = deep ? pickProModel(models) : pickModel(models);
+  if (deep && !model) {
+    return { ok: false, error: "No Gemini Pro model available to this key — deep scan needs a paid-tier key. Quick hunt still works." };
+  }
+  // Pre-flight probe: fail fast with a clear message if the key can't use Pro.
+  if (deep && !MOCK) {
+    const probe = await probeModel(geminiKey, model!);
+    if (!probe.ok) return { ok: false, error: probe.error ?? "Deep scan pre-flight failed." };
+  }
 
   const scanId = crypto.randomUUID();
   createScan(scanId, repoFullName, mode, model);
@@ -123,7 +136,7 @@ async function runScan(scanId: string): Promise<void> {
         return;
       }
 
-      const plans = planChunks(selected);
+      const plans = planChunks(selected, scan.mode === "deep" ? DEEP_CHUNK_TOKEN_BUDGET : CHUNK_TOKEN_BUDGET);
       insertChunks(
         scanId,
         plans.map((p) => ({ idx: p.idx, files: p.files.map((f) => `${f.path}|${f.size}`), estTokens: p.estTokens })),
@@ -192,6 +205,7 @@ async function runScan(scanId: string): Promise<void> {
         totalChunks,
         inventory,
         files: numbered,
+        deep: scan.mode === "deep",
       });
 
       // ── Gemini call (throttled) or mock ──
@@ -202,7 +216,13 @@ async function runScan(scanId: string): Promise<void> {
         findings = mockFindings(numbered);
       } else {
         await throttleGemini();
-        const result = await callGeminiForFindings(geminiKey, scan.model ?? "gemini-2.5-flash", prompt, FINDINGS_RESPONSE_SCHEMA);
+        const result = await callGeminiForFindings(
+          geminiKey,
+          scan.model ?? "gemini-2.5-flash",
+          prompt,
+          FINDINGS_RESPONSE_SCHEMA,
+          scan.mode === "deep" ? { thinkingBudget: 8192 } : {},
+        );
         if (result.ok) {
           findings = result.findings;
         } else {
