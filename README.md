@@ -102,6 +102,13 @@ VEX_MOCK_GEMINI=1 npm run dev   # demo the full pipeline without a Gemini key
 PORT=8080 npm start             # custom port
 ```
 
+On **Windows PowerShell**, set env vars like this instead:
+
+```powershell
+$env:VEX_MOCK_GEMINI="1"; npm run dev
+$env:PORT="8080"; npm start
+```
+
 Data directory: `~/.vex` by default; override with `VEX_DATA_DIR=/path/to/dir`.
 
 ## Status
