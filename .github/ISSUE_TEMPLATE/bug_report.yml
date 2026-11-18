@@ -1,0 +1,37 @@
+name: 🐛 Bug report
+description: Something in VEX isn't working right
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please redact any keys or tokens from logs before pasting.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you get?
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: The exact error shown in the UI and/or server console (keys redacted!)
+      render: text
+  - type: input
+    id: repo
+    attributes:
+      label: Repo scanned
+      description: Size, primary language, public/private (no need to name it)
+      placeholder: e.g. ~400 files, TypeScript, private
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: |
+        - OS:
+        - Node version (`node -v`):
+        - VEX commit/version:
+        - Scan mode: hunt / deep
+    validations:
+      required: true

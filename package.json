@@ -1,8 +1,28 @@
 {
   "name": "vex",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "VEX — local-first AI code hunter for your GitHub repos, powered by your own Gemini key.",
+  "author": "mafk21 (https://github.com/mafk21)",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mafk21/VEX.git"
+  },
+  "homepage": "https://github.com/mafk21/VEX#readme",
+  "bugs": "https://github.com/mafk21/VEX/issues",
+  "keywords": [
+    "security",
+    "code-analysis",
+    "static-analysis",
+    "vulnerability-scanner",
+    "ai",
+    "gemini",
+    "github",
+    "local-first",
+    "developer-tools",
+    "bug-hunting"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
