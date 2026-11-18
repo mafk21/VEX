@@ -127,13 +127,29 @@ export default function ScanView({ scanId }: { scanId: string }) {
         <Link href="/dashboard" className="font-mono text-xs text-ink-dim hover:text-accent">← dashboard</Link>
         <div className="flex items-center gap-2">
           {!active && (
-            <button
-              onClick={rescan}
-              disabled={rescanning}
-              className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-1.5 font-mono text-xs font-bold text-accent transition hover:bg-accent/20 disabled:opacity-40"
-            >
-              {rescanning ? "starting…" : "↻ re-scan"}
-            </button>
+            <>
+              <a
+                href={`/api/scans/${scanId}/export?format=md`}
+                title="Download report as Markdown"
+                className="rounded-lg border border-line px-3 py-1.5 font-mono text-xs text-ink-dim transition hover:border-accent/50 hover:text-accent"
+              >
+                ↓ md
+              </a>
+              <a
+                href={`/api/scans/${scanId}/export?format=json`}
+                title="Download report as JSON"
+                className="rounded-lg border border-line px-3 py-1.5 font-mono text-xs text-ink-dim transition hover:border-accent/50 hover:text-accent"
+              >
+                ↓ json
+              </a>
+              <button
+                onClick={rescan}
+                disabled={rescanning}
+                className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-1.5 font-mono text-xs font-bold text-accent transition hover:bg-accent/20 disabled:opacity-40"
+              >
+                {rescanning ? "starting…" : "↻ re-scan"}
+              </button>
+            </>
           )}
           {active && (
             <button
@@ -190,6 +206,7 @@ export default function ScanView({ scanId }: { scanId: string }) {
               {currentChunk.files.slice(0, 3).join(", ")}
               {currentChunk.files.length > 3 && ` +${currentChunk.files.length - 3} more`}
             </span>
+            <span className="ml-3 text-ink-dim/60">· throttled to ~12 Gemini calls/min (free-tier friendly)</span>
           </div>
         )}
         {active && scan.status === "fetching" && (

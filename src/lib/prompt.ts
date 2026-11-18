@@ -40,8 +40,9 @@ export function buildScanPrompt(args: {
   totalChunks: number;
   inventory: string[];
   files: NumberedFile[];
+  deep?: boolean;
 }): string {
-  const { repo, chunkIdx, totalChunks, inventory, files } = args;
+  const { repo, chunkIdx, totalChunks, inventory, files, deep } = args;
 
   const codeBlocks = files
     .map((f) => `=== FILE: ${f.path} (${f.lines} lines) ===\n${f.numbered}`)
@@ -69,7 +70,7 @@ RULES:
 5. confidence is 0.0–1.0. Omit anything below 0.4.
 6. suggested_fix must be concrete: corrected code or precise steps.
 7. Return at most 25 findings, most severe first. Clean code → return [].
-8. Output ONLY the JSON array matching the required schema.
+8. Output ONLY the JSON array matching the required schema.${deep ? "\n9. DEEP MODE: reason step by step before finalizing each finding — trace data flows across the files in this chunk, check callers/callees against the inventory, and double-check exploitability so severity is neither inflated nor understated." : ""}
 
 CODE:
 ${codeBlocks}`;

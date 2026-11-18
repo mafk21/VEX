@@ -22,7 +22,7 @@ const SKIP_FILES =
 
 // Binaries, media, styles, docs, data — no audit value for this tool
 const SKIP_EXT =
-  /\.(png|jpe?g|gif|webp|avif|ico|svg|pdf|zip|tar|gz|tgz|bz2|xz|7z|rar|woff2?|ttf|otf|eot|mp[34]|mov|avi|mkv|wav|flac|ogg|exe|dll|so|dylib|bin|dat|class|jar|war|pyc|pyo|db|sqlite3?|wasm|map|css|s[ac]ss|less|mdx?|markdown|rst|txt|csv|tsv|parquet|ipynb|snap)$/i;
+  /\.(png|jpe?g|gif|webp|avif|ico|svg|pdf|zip|tar|gz|tgz|bz2|xz|7z|rar|woff2?|ttf|otf|eot|mp[34]|mov|avi|mkv|wav|flac|ogg|exe|dll|so|dylib|bin|dat|class|jar|war|pyc|pyo|db|sqlite3?|wasm|map|min\.js|bundle\.js|css|s[ac]ss|less|mdx?|markdown|rst|txt|csv|tsv|parquet|ipynb|snap)$/i;
 
 // Generated / type-only code
 const SKIP_GENERATED = /(\.generated\.|\.gen\.|\.pb\.|\.g\.|\.d\.ts$|_pb2?\.py$|\.designer\.(cs|vb)$)/i;
@@ -39,8 +39,11 @@ const CONFIG_NAMES = /(^|\/)(dockerfile|docker-compose[^/]*|makefile|\.env[^/]*|
 const TEMPLATE_EXT = /\.(html?|ejs|hbs|mustache|twig|liquid|erb|jinja2?|njk)$/i;
 
 // Paths where vulnerabilities hurt most — scan these first
+// Paths where vulnerabilities hurt most — scan these first.
+// High-collision tokens (file/api/db) are delimiter-bounded so "Dockerfile"
+// or "capital.ts" don't get a false boost.
 const HIGH_VALUE_PATH =
-  /auth|login|signin|signup|register|password|passwd|secret|token|apikey|api[_-]?key|crypto|encrypt|payment|billing|checkout|stripe|jwt|session|cookie|middleware|guard|permission|acl|admin|upload|download|file|exec|eval|query|sql|db|database|api|server|route|controller|handler|webhook|callback|oauth|saml|csrf|cors|redirect|proxy|deserialize|sanitiz/i;
+  /auth|login|signin|signup|register|password|passwd|secret|token|apikey|api[_-]?key|crypto|encrypt|payment|billing|checkout|stripe|jwt|session|cookie|middleware|guard|permission|acl|admin|upload|download|exec|eval|query|sql|database|server|route|controller|handler|webhook|callback|oauth|saml|csrf|cors|redirect|proxy|deserialize|sanitiz|(?:^|[\/_.\-])files?(?:[\/_.\-]|$)|(?:^|[\/_.\-])apis?(?:[\/_.\-]|$)|(?:^|[\/_.\-])db(?:[\/_.\-]|$)/i;
 
 export const MAX_FILE_BYTES = 150_000; // ~37K tokens — bigger files are usually generated
 export const MAX_FILES_PER_SCAN = 600;

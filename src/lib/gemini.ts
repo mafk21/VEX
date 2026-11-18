@@ -52,6 +52,45 @@ export function pickModel(models: string[]): string {
   return flash ?? models[0];
 }
 
+/** Pick the best Pro model for deep scans; null if the key has none. */
+export function pickProModel(models: string[]): string | null {
+  if (models.includes("gemini-2.5-pro")) return "gemini-2.5-pro";
+  const stable = models.find((m) => m.includes("pro") && !/preview|exp|latest/.test(m));
+  if (stable) return stable;
+  return models.find((m) => m.includes("pro")) ?? null;
+}
+
+/**
+ * Pre-flight probe: does this key actually have access to a (paid-tier) Pro
+ * model? A tiny generateContent call answers definitively — free-tier keys
+ * get a quota/billing error.
+ */
+export async function probeModel(key: string, model: string): Promise<{ ok: boolean; error?: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${API}/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: "Reply with exactly: ok" }] }],
+        generationConfig: { maxOutputTokens: 64, temperature: 0 },
+      }),
+    });
+  } catch {
+    return { ok: false, error: "Could not reach the Gemini API from this machine." };
+  }
+  if (res.ok) return { ok: true };
+  if (res.status === 429 || res.status === 403) {
+    return {
+      ok: false,
+      error: "Deep scan needs a paid-tier Gemini key — Pro models aren't available on the free tier. Quick hunt still works.",
+    };
+  }
+  if (res.status === 404) return { ok: false, error: `Model ${model} isn't available to this key.` };
+  if (res.status === 401) return { ok: false, error: "Gemini rejected the API key. Reconnect it in setup." };
+  return { ok: false, error: `Gemini API returned ${res.status}.` };
+}
+
 /* ── scan calls ──────────────────────────────────────────────────────────── */
 
 export interface RawFinding {
@@ -145,6 +184,7 @@ export async function callGeminiForFindings(
   model: string,
   prompt: string,
   schema: unknown,
+  opts: { thinkingBudget?: number } = {},
 ): Promise<ScanCallResult> {
   const backoffs = [0, 8_000, 20_000, 45_000, 90_000];
 
@@ -163,6 +203,7 @@ export async function callGeminiForFindings(
             maxOutputTokens: 16384,
             responseMimeType: "application/json",
             responseSchema: schema,
+            ...(opts.thinkingBudget ? { thinkingConfig: { thinkingBudget: opts.thinkingBudget } } : {}),
           },
         }),
       });

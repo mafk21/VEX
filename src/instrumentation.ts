@@ -4,5 +4,14 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { resumeIncompleteScans } = await import("@/lib/scanner");
     resumeIncompleteScans();
+
+    // Graceful shutdown: WAL-mode SQLite is crash-safe; anything still running
+    // simply resumes on the next boot via resumeIncompleteScans().
+    const onSignal = () => {
+      console.log("\n[vex] shutting down — any interrupted hunt resumes on next start.");
+      process.exit(0);
+    };
+    process.once("SIGINT", onSignal);
+    process.once("SIGTERM", onSignal);
   }
 }

@@ -30,6 +30,13 @@ export default function DashboardPage() {
           >
             history
           </Link>
+          <Link
+            href="/settings"
+            title="Settings & privacy"
+            className="rounded-full border border-line bg-panel px-3 py-1.5 font-mono text-[11px] text-ink-dim transition hover:border-accent/50 hover:text-accent"
+          >
+            ⚙
+          </Link>
           <span className="hidden rounded-full border border-line bg-panel px-3 py-1.5 font-mono text-[11px] text-ink-dim sm:inline">
             ● local-only
           </span>
