@@ -38,6 +38,19 @@ export default function RepoGrid() {
   const [query, setQuery] = useState("");
   const [starting, setStarting] = useState<number | null>(null);
   const [startError, setStartError] = useState("");
+  const [lastScans, setLastScans] = useState<Record<string, { id: string; status: string; findings: Record<string, number>; createdAt: string }>>({});
+
+  useEffect(() => {
+    fetch("/api/scans")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return;
+        const map: Record<string, (typeof d.scans)[number]> = {};
+        for (const s of d.scans) if (!map[s.repoFullName]) map[s.repoFullName] = s; // list is newest-first
+        setLastScans(map);
+      })
+      .catch(() => {});
+  }, []);
 
   async function startHunt(repo: Repo) {
     setStarting(repo.id);
@@ -179,6 +192,23 @@ export default function RepoGrid() {
               <span>⑂ {r.defaultBranch}</span>
               <span className="ml-auto">{timeAgo(r.updatedAt)}</span>
             </div>
+
+            {lastScans[r.fullName] && (
+              <a
+                href={`/scans/${lastScans[r.fullName].id}`}
+                className="mt-3 block rounded-lg border border-line bg-panel-2 px-3 py-1.5 font-mono text-[10px] text-ink-dim transition hover:border-accent/40 hover:text-accent"
+              >
+                {(() => {
+                  const s = lastScans[r.fullName];
+                  if (["queued", "fetching", "scanning"].includes(s.status)) return `● hunt in progress — watch live →`;
+                  const total = Object.values(s.findings ?? {}).reduce((a, b) => a + b, 0);
+                  if (s.status === "failed") return `last hunt failed · ${timeAgo(s.createdAt)}`;
+                  if (total === 0 && s.status === "complete") return `last hunt: clean ✓ · ${timeAgo(s.createdAt)}`;
+                  const sev = ["critical", "high", "medium", "low", "info"].find((k) => (s.findings?.[k] ?? 0) > 0);
+                  return `last hunt: ${total} findings${sev ? ` (${s.findings[sev]} ${sev})` : ""} · ${timeAgo(s.createdAt)}`;
+                })()}
+              </a>
+            )}
 
             <button
               onClick={() => startHunt(r)}

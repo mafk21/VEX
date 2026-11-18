@@ -146,18 +146,18 @@ key → sees their repos.
 **Done when:** scanning a real repo produces structured findings in the local DB,
 resilient to rate limits, with live progress readable from the scan record.
 
-## Sprint 3 — Report UI (75%)
+## Sprint 3 — Report UI (75%) ✅
 
 **Goal:** the full findings experience — the product's payoff screen.
 
-- [ ] Live scan progress page (chunks done/total, current file, ETA)
-- [ ] Findings dashboard: severity summary bar, category filters, sort
-- [ ] Finding card/detail: title, severity badge, file + line range, explanation,
-      suggested fix with diff-style code block
-- [ ] Code viewer with syntax highlighting, scrolled to flagged lines
-      (source cached locally during scan)
-- [ ] Scan history per repo (past scans, finding counts, re-scan button)
-- [ ] Empty states, loading skeletons, quota-exceeded messaging
+- [x] Live scan progress page (chunks done/total, current files, elapsed + ETA, cancel)
+- [x] Findings dashboard: severity summary cards (click to filter), category tabs, sort
+- [x] Finding card/detail: title, severity badge, file + line range, explanation,
+      suggested fix block, GitHub deep-link to the exact lines
+- [x] Code viewer with syntax highlighting (highlight.js, multiline-aware),
+      auto-scrolled to flagged lines, served from the local source cache
+- [x] Scan history page + per-repo last-scan badges on the dashboard
+- [x] Empty states, loading skeletons, quota-exceeded / partial-failure messaging
 
 **Done when:** run a scan → browse a clean, useful report with code context and fixes.
 

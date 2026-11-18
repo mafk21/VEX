@@ -24,6 +24,12 @@ export default function DashboardPage() {
         </Link>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/scans"
+            className="rounded-full border border-line bg-panel px-3 py-1.5 font-mono text-[11px] text-ink-dim transition hover:border-accent/50 hover:text-accent"
+          >
+            history
+          </Link>
           <span className="hidden rounded-full border border-line bg-panel px-3 py-1.5 font-mono text-[11px] text-ink-dim sm:inline">
             ● local-only
           </span>
