@@ -1,9 +1,21 @@
-# VEX ⌖
+<div align="center">
 
-**VEX is a local-first AI code hunter.** Connect your GitHub account and your own
-Gemini API key, pick a repo, and VEX hunts the code for bugs, vulnerabilities,
-logic-flow breaks, and quality issues — then shows you exactly where each problem
-lives and how to fix it.
+<img src="assets/logo.png" alt="VEX logo" width="180" />
+
+# VEX
+
+**The AI code hunter that lives on your machine.**
+
+[![License: Source-Available (Personal Use)](https://img.shields.io/badge/license-source--available-red)](./LICENSE)
+[![Node ≥ 22.5](https://img.shields.io/badge/node-%E2%89%A5%2022.5-339933)](https://nodejs.org)
+[![Local-first](https://img.shields.io/badge/local--first-no%20telemetry-2ee6a8)](#why-local-first)
+[![Code of Conduct](https://img.shields.io/badge/code%20of%20conduct-contributor%20covenant-9cf)](./CODE_OF_CONDUCT.md)
+
+</div>
+
+Connect your GitHub account and your own Gemini API key, pick a repo, and VEX
+hunts the code for bugs, vulnerabilities, logic-flow breaks, and quality issues —
+then shows you exactly where each problem lives and how to fix it.
 
 ## Why local-first?
 
@@ -38,7 +50,7 @@ side at all**:
 Requires **Node.js ≥ 22.5** (uses the built-in SQLite module).
 
 ```bash
-git clone <this-repo> && cd VEX
+git clone https://github.com/mafk21/VEX.git && cd VEX
 npm install
 npm start          # builds & serves on http://127.0.0.1:3000
 # or: npm run dev  # development mode
@@ -47,17 +59,20 @@ npm start          # builds & serves on http://127.0.0.1:3000
 Then open http://localhost:3000 and connect:
 
 ### 1. GitHub token
+
 Go to [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
 → **Generate new token** (fine-grained) → Repository access: *All repositories* (or
 pick some) → Permissions → **Contents: Read-only** → Generate. That's the only
 permission VEX needs. (A classic PAT with the `repo` scope also works.)
 
 ### 2. Gemini API key
+
 Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) →
 **Create API key**. The free tier works fine (~1,500 requests/day; a scan uses
 roughly one request per ~120K tokens of code).
 
 ### 3. Hunt
+
 Pick a repo on the dashboard → **⌖ hunt**. Watch the live progress, then browse
 the report: severity dashboard, category filters, syntax-highlighted code context
 with the flagged lines, and a concrete suggested fix per finding.
@@ -81,9 +96,9 @@ with the flagged lines, and a concrete suggested fix per finding.
 ## Dev notes
 
 ```bash
-npm test                    # unit tests (node:test, type-stripped TS)
+npm test                        # unit tests (node:test, type-stripped TS)
 VEX_MOCK_GEMINI=1 npm run dev   # demo the full pipeline without a Gemini key
-PORT=8080 npm start         # custom port
+PORT=8080 npm start             # custom port
 ```
 
 Data directory: `~/.vex` by default; override with `VEX_DATA_DIR=/path/to/dir`.
@@ -97,3 +112,15 @@ Data directory: `~/.vex` by default; override with `VEX_DATA_DIR=/path/to/dir`.
 
 See [PLAN.md](./PLAN.md) for the full build plan and roadmap
 (stretch: `npx vex` package, Tauri desktop wrapper).
+
+## Community
+
+- [Contributing guide](./CONTRIBUTING.md) — setup, tests, PR process
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+
+## License
+
+VEX is source-available under the **VEX Personal-Use License** — see
+[LICENSE](./LICENSE). In short: run and modify it freely on your own devices for
+personal use; no redistribution and no commercial use. Scan only code you own or
+are authorized to analyze.
