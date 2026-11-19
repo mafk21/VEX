@@ -131,7 +131,7 @@ export function isGemini3Plus(model: string): boolean {
 export function buildGenerationConfig(
   model: string,
   schema: unknown,
-  opts: { thinking?: "high" | "medium"; maxOutputTokens?: number } = {},
+  opts: { thinking?: "high" | "low"; maxOutputTokens?: number } = {},
 ): Record<string, unknown> {
   const cfg: Record<string, unknown> = { maxOutputTokens: opts.maxOutputTokens ?? 16384 };
   if (schema) {
@@ -141,7 +141,8 @@ export function buildGenerationConfig(
   if (isGemini3Plus(model)) {
     // No sampling params on 3.x — reasoning depth is the dial. MINIMAL is
     // invalid on 3.8 Flash; LOW/MEDIUM/HIGH are the only accepted values.
-    cfg.thinkingConfig = { thinkingLevel: opts.thinking === "high" ? "HIGH" : "MEDIUM" };
+    // LOW = fast triage (quick hunts), HIGH = deep reasoning (deep hunts).
+    cfg.thinkingConfig = { thinkingLevel: opts.thinking === "high" ? "HIGH" : "LOW" };
   } else {
     cfg.temperature = 0.2;
     if (opts.thinking === "high") cfg.thinkingConfig = { thinkingBudget: 8192 };
@@ -293,7 +294,7 @@ export async function callGeminiForFindings(
   model: string,
   prompt: string,
   schema: unknown,
-  opts: { thinking?: "high" } = {},
+  opts: { thinking?: "high" | "low" } = {},
 ): Promise<ScanCallResult> {
   const backoffs = [0, 8_000, 20_000, 45_000, 90_000];
 

@@ -21,6 +21,7 @@ issues**, then shows you exactly where each problem lives and how to fix it.
 - 🔍 **Whole-repo hunts** — smart file selection + token-budgeted chunking, grounded with real line numbers
 - ⚡ **Two modes** — quick hunts on a free Gemini key, or deep reasoning on paid tier
 - 📊 **A real report UI** — severity dashboard, filters, syntax-highlighted code context, GitHub deep-links
+- ✅ **A triage workflow** — mark findings confirmed / false positive / ignored, track progress, export carries your verdicts
 - 🔐 **Local-first** — no accounts, no telemetry, keys encrypted at rest, one-click data wipe
 - ⏸️ **Resumable** — close the app mid-hunt, it picks up where it left off
 - 📤 **Export** — Markdown & JSON reports, straight from the scan page

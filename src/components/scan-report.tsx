@@ -34,7 +34,16 @@ export interface Finding {
   explanation: string;
   suggestedFix: string | null;
   confidence: number | null;
+  status: string;
 }
+
+const STATUS_META: Record<string, { label: string; icon: string; cls: string }> = {
+  open: { label: "open", icon: "○", cls: "border-line bg-panel-2 text-ink-dim" },
+  confirmed: { label: "confirmed", icon: "✓", cls: "border-accent/50 bg-accent/10 text-accent" },
+  false_positive: { label: "false positive", icon: "✗", cls: "border-danger/50 bg-danger/10 text-danger" },
+  ignored: { label: "ignored", icon: "⊘", cls: "border-line bg-panel-2 text-ink-dim" },
+};
+const STATUS_ORDER = ["open", "confirmed", "false_positive", "ignored", "all"];
 
 export const SEV_STYLE: Record<string, string> = {
   critical: "border-danger/60 bg-danger/10 text-danger",
@@ -70,18 +79,49 @@ interface Props {
 export default function ScanReport({ scan, findings }: Props) {
   const [sevFilter, setSevFilter] = useState<Set<string>>(new Set());
   const [catFilter, setCatFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("open");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"severity" | "confidence" | "file">("severity");
   const [selectedId, setSelectedId] = useState<number | null>(findings[0]?.id ?? null);
+  const [overrides, setOverrides] = useState<Record<number, string>>({});
+
+  // Triage state lives in SQLite; overrides keep the UI optimistic.
+  const items = useMemo(
+    () => findings.map((f) => (overrides[f.id] ? { ...f, status: overrides[f.id] } : f)),
+    [findings, overrides],
+  );
+
+  async function triage(id: number, status: string) {
+    const prev = overrides[id];
+    setOverrides((o) => ({ ...o, [id]: status }));
+    try {
+      const res = await fetch(`/api/findings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "triage failed");
+    } catch {
+      setOverrides((o) => ({ ...o, [id]: prev ?? "open" })); // revert on failure
+    }
+  }
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const f of findings) c[f.severity] = (c[f.severity] ?? 0) + 1;
+    for (const f of items) c[f.severity] = (c[f.severity] ?? 0) + 1;
     return c;
-  }, [findings]);
+  }, [items]);
+
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = { open: 0, confirmed: 0, false_positive: 0, ignored: 0 };
+    for (const f of items) c[f.status] = (c[f.status] ?? 0) + 1;
+    return c;
+  }, [items]);
 
   const filtered = useMemo(() => {
-    let list = findings;
+    let list = items;
+    if (statusFilter !== "all") list = list.filter((f) => f.status === statusFilter);
     if (sevFilter.size > 0) list = list.filter((f) => sevFilter.has(f.severity));
     if (catFilter !== "all") list = list.filter((f) => f.category === catFilter);
     const q = query.trim().toLowerCase();
@@ -94,7 +134,7 @@ export default function ScanReport({ scan, findings }: Props) {
           ? (b.confidence ?? 0) - (a.confidence ?? 0)
           : a.filePath.localeCompare(b.filePath) || (a.lineStart ?? 0) - (b.lineStart ?? 0),
     );
-  }, [findings, sevFilter, catFilter, query, sort]);
+  }, [items, sevFilter, catFilter, statusFilter, query, sort]);
 
   const selected = filtered.find((f) => f.id === selectedId) ?? filtered[0] ?? null;
 
@@ -132,6 +172,26 @@ export default function ScanReport({ scan, findings }: Props) {
             </button>
           );
         })}
+      </div>
+
+      {/* triage workflow bar */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="flex rounded-lg border border-line bg-panel p-0.5">
+          {STATUS_ORDER.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`rounded-md px-3 py-1.5 font-mono text-[11px] transition ${
+                statusFilter === s ? "bg-accent/15 text-accent" : "text-ink-dim hover:text-ink"
+              }`}
+            >
+              {s === "all" ? `all ${items.length}` : `${STATUS_META[s].icon} ${STATUS_META[s].label} ${statusCounts[s] ?? 0}`}
+            </button>
+          ))}
+        </div>
+        <span className="ml-auto font-mono text-[11px] text-ink-dim">
+          triaged {items.length - (statusCounts.open ?? 0)}/{items.length}
+        </span>
       </div>
 
       {/* toolbar */}
@@ -181,11 +241,16 @@ export default function ScanReport({ scan, findings }: Props) {
               onClick={() => setSelectedId(f.id)}
               className={`w-full rounded-xl border p-4 text-left transition ${
                 selected?.id === f.id ? "border-accent/50 bg-panel-2" : "border-line bg-panel hover:border-ink-dim/40"
-              }`}
+              } ${f.status === "ignored" || f.status === "false_positive" ? "opacity-55" : ""}`}
             >
               <div className="flex items-center gap-2">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${SEV_DOT[f.severity]}`} />
                 <span className="flex-1 truncate text-sm font-medium">{f.title}</span>
+                {f.status !== "open" && (
+                  <span className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] ${STATUS_META[f.status].cls}`}>
+                    {STATUS_META[f.status].icon} {STATUS_META[f.status].label}
+                  </span>
+                )}
               </div>
               <div className="mt-1.5 flex items-center gap-2 font-mono text-[10px] text-ink-dim">
                 <span className="truncate">{f.filePath}{f.lineStart ? `:${f.lineStart}` : ""}</span>
@@ -198,7 +263,7 @@ export default function ScanReport({ scan, findings }: Props) {
         {/* detail pane */}
         <div className="lg:col-span-3">
           {selected ? (
-            <FindingDetail scan={scan} finding={selected} />
+            <FindingDetail scan={scan} finding={selected} onTriage={triage} />
           ) : (
             <p className="rounded-xl border border-line bg-panel p-6 text-center text-sm text-ink-dim">
               Select a finding to inspect it.
@@ -210,7 +275,7 @@ export default function ScanReport({ scan, findings }: Props) {
   );
 }
 
-function FindingDetail({ scan, finding }: { scan: ReportScan; finding: Finding }) {
+function FindingDetail({ scan, finding, onTriage }: { scan: ReportScan; finding: Finding; onTriage: (id: number, status: string) => void }) {
   const [file, setFile] = useState<{ content: string; lines: number } | null | "loading" | "missing">("loading");
   const cacheRef = useRef(new Map<string, { content: string; lines: number } | null>());
 
@@ -263,6 +328,27 @@ function FindingDetail({ scan, finding }: { scan: ReportScan; finding: Finding }
           {finding.filePath}
           {finding.lineStart ? `:${finding.lineStart}${finding.lineEnd && finding.lineEnd !== finding.lineStart ? `–${finding.lineEnd}` : ""}` : ""} ↗
         </a>
+
+        {/* triage actions — the workflow: work the list, mark what you decide */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {(["confirmed", "false_positive", "ignored"] as const).map((s) => {
+            const active = finding.status === s;
+            return (
+              <button
+                key={s}
+                onClick={() => onTriage(finding.id, active ? "open" : s)}
+                className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] transition ${
+                  active ? `${STATUS_META[s].cls} ring-1 ring-current` : "border-line bg-panel-2 text-ink-dim hover:text-ink"
+                }`}
+              >
+                {STATUS_META[s].icon} {active ? `${STATUS_META[s].label} ✓` : STATUS_META[s].label}
+              </button>
+            );
+          })}
+          <span className="ml-auto font-mono text-[10px] text-ink-dim">
+            status: {STATUS_META[finding.status]?.label ?? finding.status}
+          </span>
+        </div>
       </div>
 
       <div className="p-5">

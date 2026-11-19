@@ -82,9 +82,19 @@ export function getDb(): DatabaseSync {
     const db = new DatabaseSync(path.join(vexDir(), "vex.db"));
     db.exec("PRAGMA journal_mode = WAL;");
     db.exec(SCHEMA);
+    migrate(db);
     g.__vexDb = db;
   }
   return g.__vexDb;
+}
+
+/** Additive migrations for existing local DBs (schema only grows). */
+function migrate(db: DatabaseSync): void {
+  try {
+    db.prepare("SELECT status FROM findings LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE findings ADD COLUMN status TEXT NOT NULL DEFAULT 'open'"); // v1.1: triage workflow
+  }
 }
 
 /* ── repos cache ─────────────────────────────────────────────────────────── */
@@ -320,9 +330,14 @@ export interface FindingInput {
   confidence: number | null;
 }
 
+/** Triage lifecycle: open → confirmed / false_positive / ignored (and back). */
+export const FINDING_STATUSES = ["open", "confirmed", "false_positive", "ignored"] as const;
+export type FindingStatus = (typeof FINDING_STATUSES)[number];
+
 export interface Finding extends FindingInput {
   id: number;
   scanId: string;
+  status: FindingStatus;
   createdAt: string;
 }
 
@@ -365,8 +380,34 @@ export function getFindings(scanId: string): Finding[] {
     explanation: r.explanation as string,
     suggestedFix: (r.suggested_fix as string) ?? null,
     confidence: (r.confidence as number) ?? null,
+    status: (r.status as FindingStatus) ?? "open",
     createdAt: r.created_at as string,
   }));
+}
+
+/** Update a finding's triage status. Returns the updated finding or null. */
+export function setFindingStatus(id: number, status: string): Finding | null {
+  if (!(FINDING_STATUSES as readonly string[]).includes(status)) return null;
+  const db = getDb();
+  const res = db.prepare("UPDATE findings SET status = ? WHERE id = ?").run(status, id);
+  if (Number(res.changes) === 0) return null;
+  const r = db.prepare("SELECT * FROM findings WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+  if (!r) return null;
+  return {
+    id: r.id as number,
+    scanId: r.scan_id as string,
+    filePath: r.file_path as string,
+    lineStart: (r.line_start as number) ?? null,
+    lineEnd: (r.line_end as number) ?? null,
+    severity: r.severity as string,
+    category: r.category as string,
+    title: r.title as string,
+    explanation: r.explanation as string,
+    suggestedFix: (r.suggested_fix as string) ?? null,
+    confidence: (r.confidence as number) ?? null,
+    status: (r.status as FindingStatus) ?? "open",
+    createdAt: r.created_at as string,
+  };
 }
 
 export function getFindingCounts(scanId: string): Record<string, number> {

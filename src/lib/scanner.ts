@@ -276,7 +276,7 @@ async function runScan(scanId: string): Promise<void> {
             currentModel,
             prompt,
             FINDINGS_RESPONSE_SCHEMA,
-            scan.mode === "deep" ? { thinking: "high" } : {},
+            scan.mode === "deep" ? { thinking: "high" } : { thinking: "low" },
           );
           if (result.ok) {
             findings = result.findings;
