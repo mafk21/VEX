@@ -46,6 +46,22 @@ async function throttleGemini(minIntervalMs: number): Promise<void> {
   g.__vexLastGeminiCall = Date.now();
 }
 
+/**
+ * Find a not-yet-tried candidate model this key can actually call.
+ * Gemini quotas are per model, so a hunt can survive one model's daily
+ * exhaustion by hopping to another (each is verified with a cheap probe).
+ */
+async function fallbackModel(key: string, deep: boolean, tried: Set<string>): Promise<string | null> {
+  const models = readConfig().geminiModels ?? [];
+  for (const candidate of (deep ? deepCandidates(models) : quickCandidates(models)).slice(0, 5)) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    const probe = await probeModel(key, candidate);
+    if (probe.ok) return candidate;
+  }
+  return null;
+}
+
 export type StartResult = { ok: true; scanId: string } | { ok: false; error: string };
 
 export async function startScan(repoFullName: string, mode: "quick" | "deep" = "quick"): Promise<StartResult> {
@@ -195,6 +211,11 @@ async function runScan(scanId: string): Promise<void> {
     let chunksFailed = 0;
     let firstChunkError: string | null = null;
 
+    // Gemini quotas are per model — if one model's daily bucket runs dry
+    // mid-hunt, hop to the next candidate instead of killing the scan.
+    let currentModel = scan.model ?? DEFAULT_MODEL;
+    const modelsTried = new Set<string>([currentModel]);
+
     for (const chunk of pending) {
       if (cancelled()) return;
       setChunkStatus(chunk.id, "running");
@@ -246,23 +267,35 @@ async function runScan(scanId: string): Promise<void> {
       if (MOCK) {
         findings = mockFindings(numbered);
       } else {
-        await throttleGemini(scan.mode === "deep" ? DEEP_MIN_INTERVAL_MS : GEMINI_MIN_INTERVAL_MS);
-        const result = await callGeminiForFindings(
-          geminiKey,
-          scan.model ?? DEFAULT_MODEL,
-          prompt,
-          FINDINGS_RESPONSE_SCHEMA,
-          scan.mode === "deep" ? { thinking: "high" } : {},
-        );
-        if (result.ok) {
-          findings = result.findings;
-        } else {
+        // Retry the chunk on model fallback when a model's daily quota runs dry.
+        let attempts = 0;
+        while (attempts++ < 3) {
+          await throttleGemini(scan.mode === "deep" ? DEEP_MIN_INTERVAL_MS : GEMINI_MIN_INTERVAL_MS);
+          const result = await callGeminiForFindings(
+            geminiKey,
+            currentModel,
+            prompt,
+            FINDINGS_RESPONSE_SCHEMA,
+            scan.mode === "deep" ? { thinking: "high" } : {},
+          );
+          if (result.ok) {
+            findings = result.findings;
+            break;
+          }
           callError = result.error;
-          if (result.quotaExhausted) {
+          if (!result.quotaExhausted) break;
+          const next = await fallbackModel(geminiKey, scan.mode === "deep", modelsTried);
+          if (!next) {
             setChunkStatus(chunk.id, "failed", callError);
-            updateScan(scanId, { status: "failed", error: callError, finishedAt: new Date().toISOString() });
+            updateScan(scanId, {
+              status: "failed",
+              error: `Free quota exhausted on every model this key can use (tried: ${[...modelsTried].join(", ")}). Daily quotas reset at midnight Pacific Time — or add a paid key for much higher limits.`,
+              finishedAt: new Date().toISOString(),
+            });
             return;
           }
+          currentModel = next;
+          updateScan(scanId, { model: next });
         }
       }
 
