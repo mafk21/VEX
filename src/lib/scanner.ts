@@ -26,13 +26,16 @@ import { callGeminiForFindings, quickCandidates, deepCandidates, probeModel, val
  */
 
 const MOCK = process.env.VEX_MOCK_GEMINI === "1";
-const GEMINI_MIN_INTERVAL_MS = 5_000; // ≤12 req/min — fits Flash-Lite's 15 RPM free tier
+const GEMINI_MIN_INTERVAL_MS = 5_000; // ≤12 req/min — under the 15 RPM free tier
 const DEEP_MIN_INTERVAL_MS = 13_000; // ~4.6 req/min — 3.8 Flash free tier is only 5 RPM
+const FREE_TIER_TPM = 200_000; // input tokens/min pacing (free tier 250K — headroom for retries)
+const FREE_TIER_RPM = 12;
 const CONTENT_FETCH_CONCURRENCY = 4;
 
 const g = globalThis as unknown as {
   __vexWorkers?: Map<string, { cancel: boolean }>;
   __vexLastGeminiCall?: number;
+  __vexGeminiLog?: Array<{ at: number; tokens: number }>;
 };
 const workers = (g.__vexWorkers ??= new Map());
 
@@ -40,9 +43,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function throttleGemini(minIntervalMs: number): Promise<void> {
-  const wait = minIntervalMs - (Date.now() - (g.__vexLastGeminiCall ?? 0));
-  if (wait > 0) await sleep(wait);
+/**
+ * Rate pacing that respects BOTH free-tier windows: requests/min AND input
+ * tokens/min. A fixed interval alone lets several big chunks land in the same
+ * minute and 429-storm; tracking a rolling token window prevents that.
+ */
+async function throttleGemini(estTokens: number, minIntervalMs: number): Promise<void> {
+  const log = (g.__vexGeminiLog ??= []);
+  for (;;) {
+    const now = Date.now();
+    while (log.length > 0 && now - log[0].at > 60_000) log.shift();
+    const tokensInWindow = log.reduce((sum, e) => sum + e.tokens, 0);
+    const intervalOk = now - (g.__vexLastGeminiCall ?? 0) >= minIntervalMs;
+    if (intervalOk && log.length < FREE_TIER_RPM && tokensInWindow + estTokens <= FREE_TIER_TPM) break;
+    await sleep(2_000);
+  }
+  log.push({ at: Date.now(), tokens: estTokens });
   g.__vexLastGeminiCall = Date.now();
 }
 
@@ -240,7 +256,6 @@ async function runScan(scanId: string): Promise<void> {
           if (!r) continue;
           numbered.push(r.prepared);
           saveScanFile(scanId, r.prepared.path, r.raw, r.prepared.lines);
-          filesScanned++;
         }
       }
 
@@ -270,13 +285,13 @@ async function runScan(scanId: string): Promise<void> {
         // Retry the chunk on model fallback when a model's daily quota runs dry.
         let attempts = 0;
         while (attempts++ < 3) {
-          await throttleGemini(scan.mode === "deep" ? DEEP_MIN_INTERVAL_MS : GEMINI_MIN_INTERVAL_MS);
+          await throttleGemini(chunk.estTokens, scan.mode === "deep" ? DEEP_MIN_INTERVAL_MS : GEMINI_MIN_INTERVAL_MS);
           const result = await callGeminiForFindings(
             geminiKey,
             currentModel,
             prompt,
             FINDINGS_RESPONSE_SCHEMA,
-            scan.mode === "deep" ? { thinking: "high" } : { thinking: "low" },
+            scan.mode === "deep" ? { thinking: "high" } : {},
           );
           if (result.ok) {
             findings = result.findings;
@@ -329,6 +344,7 @@ async function runScan(scanId: string): Promise<void> {
       }
 
       setChunkStatus(chunk.id, "done");
+      filesScanned += numbered.length; // files only count as scanned when their chunk was actually analyzed
       advanceProgress(scanId);
       const cov = getScan(scanId)?.coverage;
       if (cov) updateScan(scanId, { coverage: { ...cov, files_scanned: filesScanned } });
@@ -343,7 +359,7 @@ async function runScan(scanId: string): Promise<void> {
       error: allFailed
         ? `All ${totalChunks} chunks failed.${firstChunkError ? ` Gemini said: ${firstChunkError}` : " Check your Gemini key and quota."}`
         : chunksFailed > 0
-          ? `${chunksFailed} of ${totalChunks} chunks failed — partial results shown.`
+          ? `${chunksFailed} of ${totalChunks} chunks failed — partial results shown.${firstChunkError ? ` First failure: ${firstChunkError}` : ""}`
           : null,
       finishedAt: new Date().toISOString(),
     });

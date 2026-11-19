@@ -99,7 +99,7 @@ test("buildGenerationConfig uses the Gemini 3 shape for 3.x models", () => {
   assert.deepEqual(cfg.thinkingConfig, { thinkingLevel: "HIGH" });
   assert.equal(cfg.responseMimeType, "application/json");
   const plain = buildGenerationConfig("gemini-3.5-flash-lite", null);
-  assert.deepEqual(plain.thinkingConfig, { thinkingLevel: "LOW" }); // fast triage default
+  assert.deepEqual(plain.thinkingConfig, { thinkingLevel: "MEDIUM" }); // balanced default
   assert.equal("responseMimeType" in plain, false); // probe calls: no schema
 });
 

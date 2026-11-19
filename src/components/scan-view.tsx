@@ -246,11 +246,21 @@ export default function ScanView({ scanId }: { scanId: string }) {
       {/* final states */}
       {!active && findings.length > 0 && <ScanReport scan={scan} findings={findings} />}
 
-      {!active && findings.length === 0 && scan.status === "complete" && (
+      {!active && findings.length === 0 && scan.status === "complete" && !scan.error && (
         <div className="mt-6 rounded-xl border border-accent/30 bg-accent/5 p-10 text-center">
           <p className="text-xl text-accent">✓ Clean hunt</p>
           <p className="mt-2 text-sm text-ink-dim">
             VEX found nothing worth flagging across {scan.coverage?.files_scanned ?? 0} scanned files.
+          </p>
+        </div>
+      )}
+
+      {!active && findings.length === 0 && scan.status === "complete" && scan.error && (
+        <div className="mt-6 rounded-xl border border-warn/30 bg-warn/5 p-10 text-center">
+          <p className="text-xl text-warn">⚠ Incomplete hunt</p>
+          <p className="mt-2 text-sm text-ink-dim">
+            Some chunks failed, so only part of the repo was analyzed — treat zero findings with
+            suspicion and hit re-scan.
           </p>
         </div>
       )}
