@@ -3,6 +3,22 @@
 All notable changes to VEX are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] — 2026-11-18
+
+### Fixed
+- **Hunts aborted on any rate limit**: every Gemini 429 body says "Quota
+  exceeded", and the daily-quota detector matched that text — so a routine
+  per-minute rate limit was misclassified as daily exhaustion and killed the
+  whole hunt. Detection now reads Google's actual `quotaId`: `PerDay` → daily,
+  `limit: 0` → model has no quota on this tier, otherwise per-minute →
+  honor `RetryInfo` and retry.
+
+### Added
+- **Model fallback mid-hunt**: Gemini quotas are per model, so when a model's
+  daily bucket runs dry the hunt probes and hops to the next available model
+  instead of failing. The hunt page shows the model actually used; the error
+  lists every model tried only if all are exhausted.
+
 ## [1.0.2] — 2026-11-18
 
 ### Fixed

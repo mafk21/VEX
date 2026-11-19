@@ -181,7 +181,8 @@ export async function probeModel(key: string, model: string): Promise<{ ok: bool
     return { ok: false, error: "Could not reach the Gemini API from this machine." };
   }
   if (res.ok) return { ok: true };
-  const detail = googleErrorSnippet(await res.text().catch(() => ""));
+  const bodyText = await res.text().catch(() => "");
+  const detail = googleErrorSnippet(bodyText);
   if (res.status === 404) {
     return {
       ok: false,
@@ -192,7 +193,10 @@ export async function probeModel(key: string, model: string): Promise<{ ok: bool
   if (res.status === 403) {
     return { ok: false, error: `This key isn't allowed to call ${model}${detail ? `: ${detail}` : ""}` };
   }
-  if (res.status === 429) return { ok: false, error: "Gemini rate limit hit during pre-flight — wait a moment and retry." };
+  if (res.status === 429) {
+    if (/limit:\s*0\b/.test(bodyText)) return { ok: false, error: `Model ${model} has no quota on this key's tier.` };
+    return { ok: false, error: `Gemini rate limit hit during pre-flight — wait a moment and retry.${detail ? ` (${detail})` : ""}` };
+  }
   return { ok: false, error: `Gemini API returned ${res.status}${detail ? `: ${detail}` : ""}` };
 }
 
@@ -323,11 +327,23 @@ export async function callGeminiForFindings(
     const detail = googleErrorSnippet(body);
 
     if (res.status === 429) {
-      const daily = /daily|per.day|quota.*exceed|GenerateRequestsPerDay/i.test(body);
-      if (daily) {
+      // Discriminate by the quotaId Google reports — the body ALWAYS says
+      // "Quota exceeded", so matching that text misclassifies per-minute
+      // rate limits as daily exhaustion.
+      //   ...PerDay...  → daily quota for THIS MODEL (resets midnight PT)
+      //   limit: 0      → this model has no quota on this tier at all
+      //   otherwise     → per-minute RPM/TPM — honor RetryInfo and retry
+      if (/limit:\s*0\b/.test(body)) {
         return {
           ok: false,
-          error: "Gemini free-tier daily quota is exhausted — it resets at midnight Pacific Time. Try again tomorrow or use a paid key.",
+          error: `Model ${model} has no quota on this key's tier (limit: 0).`,
+          quotaExhausted: true,
+        };
+      }
+      if (/PerDay|per_day/i.test(body)) {
+        return {
+          ok: false,
+          error: `Daily free-tier quota for ${model} is exhausted.`,
           quotaExhausted: true,
         };
       }

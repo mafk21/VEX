@@ -194,7 +194,7 @@ export function createScan(id: string, repoFullName: string, mode: string, model
 
 export function updateScan(
   id: string,
-  patch: Partial<{ status: string; totalChunks: number; doneChunks: number; coverage: Coverage; error: string | null; finishedAt: string }>,
+  patch: Partial<{ status: string; totalChunks: number; doneChunks: number; coverage: Coverage; error: string | null; finishedAt: string; model: string }>,
 ): void {
   const sets: string[] = [];
   const vals: Array<string | number | null> = [];
@@ -202,6 +202,7 @@ export function updateScan(
   if (patch.totalChunks !== undefined) { sets.push("total_chunks = ?"); vals.push(patch.totalChunks); }
   if (patch.doneChunks !== undefined) { sets.push("done_chunks = ?"); vals.push(patch.doneChunks); }
   if (patch.coverage !== undefined) { sets.push("coverage = ?"); vals.push(JSON.stringify(patch.coverage)); }
+  if (patch.model !== undefined) { sets.push("model = ?"); vals.push(patch.model); }
   if (patch.error !== undefined) { sets.push("error = ?"); vals.push(patch.error); }
   if (patch.finishedAt !== undefined) { sets.push("finished_at = ?"); vals.push(patch.finishedAt); }
   if (sets.length === 0) return;
