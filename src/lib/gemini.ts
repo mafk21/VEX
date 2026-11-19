@@ -141,8 +141,8 @@ export function buildGenerationConfig(
   if (isGemini3Plus(model)) {
     // No sampling params on 3.x — reasoning depth is the dial. MINIMAL is
     // invalid on 3.8 Flash; LOW/MEDIUM/HIGH are the only accepted values.
-    // LOW = fast triage (quick hunts), HIGH = deep reasoning (deep hunts).
-    cfg.thinkingConfig = { thinkingLevel: opts.thinking === "high" ? "HIGH" : "LOW" };
+    // Quick hunts run MEDIUM (LOW misses too much); deep hunts run HIGH.
+    cfg.thinkingConfig = { thinkingLevel: opts.thinking === "high" ? "HIGH" : opts.thinking === "low" ? "LOW" : "MEDIUM" };
   } else {
     cfg.temperature = 0.2;
     if (opts.thinking === "high") cfg.thinkingConfig = { thinkingBudget: 8192 };

@@ -5,7 +5,7 @@ import type { SelectedFile } from "./filter";
  * budget, so each Gemini call carries as much related context as possible.
  */
 
-export const CHUNK_TOKEN_BUDGET = 120_000; // ~480KB of code per Gemini call
+export const CHUNK_TOKEN_BUDGET = 60_000; // sized so 3 chunks/min stay under the 250K TPM free tier
 const CHARS_PER_TOKEN = 4;
 
 export function estimateTokens(chars: number): number {

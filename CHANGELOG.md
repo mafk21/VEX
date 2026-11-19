@@ -3,6 +3,24 @@
 All notable changes to VEX are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] — 2026-11-18
+
+### Fixed
+- **Chunk failures from TPM 429-storms**: the throttle paced requests/minute but
+  ignored tokens/minute — two ~120K-token chunks in one minute slammed the free
+  tier's 250K TPM limit. The scanner now paces against BOTH windows (rolling
+  60s token budget + RPM + minimum interval), and chunks are sized at ~60K
+  tokens so three per minute fit with headroom.
+- **Misleading "Clean hunt" banner**: a hunt with failed chunks no longer
+  declares victory — it shows "⚠ Incomplete hunt" and tells you to treat zero
+  findings with suspicion.
+- **Honest coverage numbers**: files are only counted as scanned when their
+  chunk was actually analyzed (fetching ≠ analyzing).
+- Partial-failure messages now include the first real error.
+
+### Changed
+- Quick hunts run at thinking level MEDIUM — LOW was fast but missed too much.
+
 ## [1.1.0] — 2026-11-18
 
 ### Added
