@@ -37,6 +37,15 @@ export function buildMarkdownReport(scan: ScanRecord, findings: Finding[]): stri
     return lines.join("\n");
   }
 
+  const triage = { confirmed: 0, false_positive: 0, ignored: 0, open: 0 };
+  for (const f of findings) triage[f.status] = (triage[f.status] ?? 0) + 1;
+  if (findings.some((f) => f.status !== "open")) {
+    lines.push(
+      `**Triage:** ${triage.confirmed} confirmed · ${triage.false_positive} false positive · ${triage.ignored} ignored · ${triage.open} still open`,
+      "",
+    );
+  }
+
   const bySev = ["critical", "high", "medium", "low", "info"];
   for (const sev of bySev) {
     const group = findings.filter((f) => f.severity === sev);
@@ -45,7 +54,10 @@ export function buildMarkdownReport(scan: ScanRecord, findings: Finding[]): stri
     group.forEach((f, i) => {
       const loc = `\`${f.filePath}${f.lineStart ? `:${f.lineStart}${f.lineEnd && f.lineEnd !== f.lineStart ? `–${f.lineEnd}` : ""}` : ""}\``;
       lines.push(`### ${i + 1}. ${f.title}`, "");
-      lines.push(`${loc} · **${f.category}**${f.confidence !== null ? ` · ${(f.confidence * 100).toFixed(0)}% confidence` : ""}`, "");
+      lines.push(
+        `${loc} · **${f.category}**${f.confidence !== null ? ` · ${(f.confidence * 100).toFixed(0)}% confidence` : ""}${f.status !== "open" ? ` · _${f.status.replace("_", " ")}_` : ""}`,
+        "",
+      );
       lines.push(f.explanation, "");
       if (f.suggestedFix) {
         lines.push("**Suggested fix**", "", "```", f.suggestedFix, "```", "");

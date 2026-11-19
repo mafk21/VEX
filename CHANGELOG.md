@@ -3,6 +3,18 @@
 All notable changes to VEX are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] — 2026-11-18
+
+### Added
+- **Triage workflow**: every finding can be marked ✓ confirmed / ✗ false positive /
+  ⊘ ignored (and reopened), with a status filter bar, triage progress
+  ("triaged 5/18"), badges in the list, and triage state in Markdown/JSON exports.
+  `PATCH /api/findings/:id`.
+
+### Changed
+- **Quick hunts are much faster**: thinking level LOW on Gemini 3.x (fast triage)
+  instead of the default MEDIUM; deep hunts keep HIGH.
+
 ## [1.0.3] — 2026-11-18
 
 ### Fixed
