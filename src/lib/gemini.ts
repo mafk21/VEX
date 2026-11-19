@@ -1,11 +1,20 @@
 /**
  * Gemini API client. Calls are made directly from the user's machine with
  * their own API key (BYOK) — nothing transits any VEX server.
+ *
+ * Model landscape (Nov 2026): Google deprecated gemini-2.5-flash / 2.5-pro and
+ * closed them to keys that hadn't used them before 2026-09-18 (calls 404 for
+ * new keys; on 2026-12-01 they auto-route to 3.5-flash-lite / 3.8-flash).
+ * VEX therefore discovers the key's model list at scan start, ranks current
+ * models first, and probes a candidate before burning a scan on it.
  */
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
 
-export const DEFAULT_MODEL = "gemini-2.5-flash";
+/** Quick hunts default to Flash-Lite: the only model with a usable free tier (~15 RPM / ~500 RPD). */
+export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
+/** Deep scans default to the strongest reasoning Flash (free tier is only ~5 RPM / ~20 RPD — paid key recommended). */
+export const DEFAULT_DEEP_MODEL = "gemini-3.8-flash";
 
 export type GeminiValidation =
   | { ok: true; models: string[] }
@@ -44,26 +53,118 @@ export function summarizeModels(models: string[]): { flash: string[]; pro: strin
   };
 }
 
-/** Pick the best scan model available to this key. */
-export function pickModel(models: string[]): string {
-  if (models.length === 0) return DEFAULT_MODEL;
-  if (models.includes(DEFAULT_MODEL)) return DEFAULT_MODEL;
-  const flash = models.find((m) => m.includes("flash") && !m.includes("lite") && !m.includes("image") && !m.includes("tts"));
-  return flash ?? models[0];
-}
+/* ── model selection ─────────────────────────────────────────────────────── */
 
-/** Pick the best Pro model for deep scans; null if the key has none. */
-export function pickProModel(models: string[]): string | null {
-  if (models.includes("gemini-2.5-pro")) return "gemini-2.5-pro";
-  const stable = models.find((m) => m.includes("pro") && !/preview|exp|latest/.test(m));
-  if (stable) return stable;
-  return models.find((m) => m.includes("pro")) ?? null;
+function uniq(list: Array<string | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of list) {
+    if (m && !seen.has(m)) {
+      seen.add(m);
+      out.push(m);
+    }
+  }
+  return out;
 }
 
 /**
- * Pre-flight probe: does this key actually have access to a (paid-tier) Pro
- * model? A tiny generateContent call answers definitively — free-tier keys
- * get a quota/billing error.
+ * Ordered quick-hunt candidates for this key's model list. Current (3.x) models
+ * first — Google's list endpoint still returns deprecated 2.5 models that new
+ * keys cannot actually call, so 2.x is only a last resort for legacy keys.
+ */
+export function quickCandidates(models: string[]): string[] {
+  if (models.length === 0) return [DEFAULT_MODEL];
+  const has = (m: string) => models.includes(m);
+  const gen3 = models.filter((m) => /^gemini-3/.test(m));
+  return uniq([
+    has("gemini-3.5-flash-lite") ? "gemini-3.5-flash-lite" : undefined,
+    has("gemini-3.1-flash-lite") ? "gemini-3.1-flash-lite" : undefined,
+    ...gen3.filter((m) => m.includes("flash-lite")),
+    has("gemini-3.8-flash") ? "gemini-3.8-flash" : undefined,
+    ...gen3.filter((m) => m.includes("flash")),
+    // legacy — only callable by keys that used these models before 2026-09-18
+    has("gemini-2.5-flash") ? "gemini-2.5-flash" : undefined,
+    has("gemini-2.5-flash-lite") ? "gemini-2.5-flash-lite" : undefined,
+    ...models.filter((m) => m.includes("flash")),
+    models[0],
+  ]);
+}
+
+/** Ordered deep-hunt candidates: strongest reasoning models first. */
+export function deepCandidates(models: string[]): string[] {
+  if (models.length === 0) return [DEFAULT_DEEP_MODEL];
+  const has = (m: string) => models.includes(m);
+  const gen3 = models.filter((m) => /^gemini-3/.test(m));
+  return uniq([
+    has("gemini-3.8-flash") ? "gemini-3.8-flash" : undefined,
+    ...models.filter((m) => m.includes("pro") && !/preview|exp|latest/.test(m)),
+    ...gen3.filter((m) => m.includes("flash") && !m.includes("lite")),
+    ...models.filter((m) => m.includes("pro")),
+    ...gen3.filter((m) => m.includes("flash-lite")),
+    ...models.filter((m) => m.includes("flash")),
+    models[0],
+  ]);
+}
+
+/** Best quick-hunt model for this key. */
+export function pickModel(models: string[]): string {
+  return quickCandidates(models)[0] ?? DEFAULT_MODEL;
+}
+
+/** Best deep-hunt model for this key. */
+export function pickDeepModel(models: string[]): string {
+  return deepCandidates(models)[0] ?? DEFAULT_DEEP_MODEL;
+}
+
+/* ── request shape ───────────────────────────────────────────────────────── */
+
+/** Gemini 3+ removed temperature/top_p/top_k and replaced thinking_budget with thinking_level. */
+export function isGemini3Plus(model: string): boolean {
+  const m = model.match(/^gemini-(\d+)/);
+  return m !== null && Number(m[1]) >= 3;
+}
+
+/**
+ * Build a generationConfig valid for the target model's API generation.
+ * Exported for tests. Pass `schema: null` for a plain-text probe call.
+ */
+export function buildGenerationConfig(
+  model: string,
+  schema: unknown,
+  opts: { thinking?: "high" | "medium"; maxOutputTokens?: number } = {},
+): Record<string, unknown> {
+  const cfg: Record<string, unknown> = { maxOutputTokens: opts.maxOutputTokens ?? 16384 };
+  if (schema) {
+    cfg.responseMimeType = "application/json";
+    cfg.responseSchema = schema;
+  }
+  if (isGemini3Plus(model)) {
+    // No sampling params on 3.x — reasoning depth is the dial. MINIMAL is
+    // invalid on 3.8 Flash; LOW/MEDIUM/HIGH are the only accepted values.
+    cfg.thinkingConfig = { thinkingLevel: opts.thinking === "high" ? "HIGH" : "MEDIUM" };
+  } else {
+    cfg.temperature = 0.2;
+    if (opts.thinking === "high") cfg.thinkingConfig = { thinkingBudget: 8192 };
+  }
+  return cfg;
+}
+
+/** Extract Google's human-readable error message from an error body, trimmed. */
+function googleErrorSnippet(body: string): string {
+  try {
+    const msg = (JSON.parse(body) as { error?: { message?: string } })?.error?.message;
+    if (typeof msg === "string" && msg.length > 0) return msg.length > 200 ? `${msg.slice(0, 200)}…` : msg;
+  } catch {
+    /* not JSON */
+  }
+  return "";
+}
+
+/**
+ * Pre-flight probe: can this key actually call this model? A tiny
+ * generateContent with the same request shape as a real scan call answers
+ * definitively — Google's model list includes deprecated models that new
+ * keys cannot call.
  */
 export async function probeModel(key: string, model: string): Promise<{ ok: boolean; error?: string }> {
   let res: Response;
@@ -73,22 +174,26 @@ export async function probeModel(key: string, model: string): Promise<{ ok: bool
       headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: "Reply with exactly: ok" }] }],
-        generationConfig: { maxOutputTokens: 64, temperature: 0 },
+        generationConfig: buildGenerationConfig(model, null, { maxOutputTokens: 64 }),
       }),
     });
   } catch {
     return { ok: false, error: "Could not reach the Gemini API from this machine." };
   }
   if (res.ok) return { ok: true };
-  if (res.status === 429 || res.status === 403) {
+  const detail = googleErrorSnippet(await res.text().catch(() => ""));
+  if (res.status === 404) {
     return {
       ok: false,
-      error: "Deep scan needs a paid-tier Gemini key — Pro models aren't available on the free tier. Quick hunt still works.",
+      error: `Model ${model} isn't callable by this key (Google closed the 2.5 models to keys created after Sep 2026).`,
     };
   }
-  if (res.status === 404) return { ok: false, error: `Model ${model} isn't available to this key.` };
   if (res.status === 401) return { ok: false, error: "Gemini rejected the API key. Reconnect it in setup." };
-  return { ok: false, error: `Gemini API returned ${res.status}.` };
+  if (res.status === 403) {
+    return { ok: false, error: `This key isn't allowed to call ${model}${detail ? `: ${detail}` : ""}` };
+  }
+  if (res.status === 429) return { ok: false, error: "Gemini rate limit hit during pre-flight — wait a moment and retry." };
+  return { ok: false, error: `Gemini API returned ${res.status}${detail ? `: ${detail}` : ""}` };
 }
 
 /* ── scan calls ──────────────────────────────────────────────────────────── */
@@ -176,15 +281,15 @@ function parseRetryDelay(body: string): number {
 }
 
 /**
- * One structured-output scan call with retry/backoff tuned for the free tier
- * (~15 RPM). Gives up with a clear error when the daily quota is exhausted.
+ * One structured-output scan call with retry/backoff tuned for the free tier.
+ * Errors include Google's actual message so the UI can show the real cause.
  */
 export async function callGeminiForFindings(
   key: string,
   model: string,
   prompt: string,
   schema: unknown,
-  opts: { thinkingBudget?: number } = {},
+  opts: { thinking?: "high" } = {},
 ): Promise<ScanCallResult> {
   const backoffs = [0, 8_000, 20_000, 45_000, 90_000];
 
@@ -198,13 +303,7 @@ export async function callGeminiForFindings(
         headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 16384,
-            responseMimeType: "application/json",
-            responseSchema: schema,
-            ...(opts.thinkingBudget ? { thinkingConfig: { thinkingBudget: opts.thinkingBudget } } : {}),
-          },
+          generationConfig: buildGenerationConfig(model, schema, { thinking: opts.thinking }),
         }),
       });
     } catch {
@@ -221,6 +320,7 @@ export async function callGeminiForFindings(
     }
 
     const body = await res.text().catch(() => "");
+    const detail = googleErrorSnippet(body);
 
     if (res.status === 429) {
       const daily = /daily|per.day|quota.*exceed|GenerateRequestsPerDay/i.test(body);
@@ -237,11 +337,18 @@ export async function callGeminiForFindings(
     }
 
     if (res.status === 401 || res.status === 403) {
-      return { ok: false, error: "Gemini rejected the API key. Reconnect it in setup.", quotaExhausted: false };
+      return { ok: false, error: `Gemini rejected the API key${detail ? `: ${detail}` : ""}. Reconnect it in setup.`, quotaExhausted: false };
+    }
+    if (res.status === 404) {
+      return {
+        ok: false,
+        error: `Model ${model} isn't callable by this key (Google closed the 2.5 models to newer keys). Reconnect your Gemini key in setup to refresh the model list.`,
+        quotaExhausted: false,
+      };
     }
     if (res.status >= 500) continue; // transient server error — retry
 
-    return { ok: false, error: `Gemini API returned ${res.status}.`, quotaExhausted: false };
+    return { ok: false, error: `Gemini API returned ${res.status}${detail ? `: ${detail}` : ""}`, quotaExhausted: false };
   }
 
   return { ok: false, error: "Gemini rate limit persisted after several retries. Re-run the scan shortly.", quotaExhausted: false };

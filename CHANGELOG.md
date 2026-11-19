@@ -3,6 +3,24 @@
 All notable changes to VEX are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] — 2026-11-18
+
+### Fixed
+- **Hunts failed for new Gemini keys**: Google deprecated `gemini-2.5-flash`/`2.5-pro`
+  (Nov 2) and closed them to keys created after Sep 18, 2026 — VEX's default model
+  was uncalled-for new users. VEX now defaults to `gemini-3.5-flash-lite` (hunt) and
+  `gemini-3.8-flash` (deep), refreshes the key's model list at every hunt start,
+  and probes up to 3 candidate models before scanning — failing fast with the real
+  error instead of after a full scan.
+- Failed scans now show the actual Gemini API error message instead of a generic
+  "check your key and quota" banner.
+
+### Changed
+- Gemini 3 API request shape: `thinking_level` (LOW/MEDIUM/HIGH) replaces
+  `thinking_budget`; `temperature`/`top_p` are no longer sent to 3.x models
+  (removed by Google).
+- Deep scans throttle to ~4.6 req/min (3.8 Flash free tier is 5 RPM).
+
 ## [1.0.1] — 2026-11-18
 
 ### Fixed

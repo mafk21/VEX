@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getGitHubToken, getGeminiKey, readConfig } from "./config";
+import { getGitHubToken, getGeminiKey, readConfig, saveGeminiModels } from "./config";
 import {
   createScan, updateScan, getScan, insertChunks, getPendingChunks, setChunkStatus,
   resetRunningChunks, saveScanFile, getScanFileLines, insertFinding, getResumableScans,
@@ -12,7 +12,7 @@ import { planChunks, CHUNK_TOKEN_BUDGET } from "./packer";
 /** Deep scans reason harder over smaller chunks. */
 const DEEP_CHUNK_TOKEN_BUDGET = 60_000;
 import { buildScanPrompt, prepareFile, FINDINGS_RESPONSE_SCHEMA, type NumberedFile } from "./prompt";
-import { callGeminiForFindings, pickModel, pickProModel, probeModel, type RawFinding } from "./gemini";
+import { callGeminiForFindings, quickCandidates, deepCandidates, probeModel, validateGeminiKey, DEFAULT_MODEL, type RawFinding } from "./gemini";
 
 /**
  * In-process scan worker. Because VEX runs locally (no serverless timeouts),
@@ -26,7 +26,8 @@ import { callGeminiForFindings, pickModel, pickProModel, probeModel, type RawFin
  */
 
 const MOCK = process.env.VEX_MOCK_GEMINI === "1";
-const GEMINI_MIN_INTERVAL_MS = 5_000; // ≤12 requests/minute
+const GEMINI_MIN_INTERVAL_MS = 5_000; // ≤12 req/min — fits Flash-Lite's 15 RPM free tier
+const DEEP_MIN_INTERVAL_MS = 13_000; // ~4.6 req/min — 3.8 Flash free tier is only 5 RPM
 const CONTENT_FETCH_CONCURRENCY = 4;
 
 const g = globalThis as unknown as {
@@ -39,8 +40,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function throttleGemini(): Promise<void> {
-  const wait = GEMINI_MIN_INTERVAL_MS - (Date.now() - (g.__vexLastGeminiCall ?? 0));
+async function throttleGemini(minIntervalMs: number): Promise<void> {
+  const wait = minIntervalMs - (Date.now() - (g.__vexLastGeminiCall ?? 0));
   if (wait > 0) await sleep(wait);
   g.__vexLastGeminiCall = Date.now();
 }
@@ -55,16 +56,45 @@ export async function startScan(repoFullName: string, mode: "quick" | "deep" = "
   const repo = getCachedRepo(repoFullName);
   if (!repo) return { ok: false, error: `Unknown repository: ${repoFullName}. Refresh the repo list.` };
 
-  const models = readConfig().geminiModels ?? [];
+  const storedModels = readConfig().geminiModels ?? [];
   const deep = mode === "deep";
-  const model = deep ? pickProModel(models) : pickModel(models);
-  if (deep && !model) {
-    return { ok: false, error: "No Gemini Pro model available to this key — deep scan needs a paid-tier key. Quick hunt still works." };
+
+  // Refresh the key's model list (cheap, not quota-counted) — Google deprecates
+  // models often, and their list includes models new keys can't actually call.
+  let models = storedModels;
+  if (!MOCK) {
+    const v = await validateGeminiKey(geminiKey);
+    if (v.ok) {
+      if (JSON.stringify(v.models) !== JSON.stringify(storedModels)) saveGeminiModels(v.models);
+      models = v.models;
+    }
   }
-  // Pre-flight probe: fail fast with a clear message if the key can't use Pro.
-  if (deep && !MOCK) {
-    const probe = await probeModel(geminiKey, model!);
-    if (!probe.ok) return { ok: false, error: probe.error ?? "Deep scan pre-flight failed." };
+
+  // Pre-flight probe: try candidates in preference order until one responds.
+  // This fails fast with a clear message instead of burning a whole scan on a
+  // model the key can't call (e.g. deprecated 2.5 models on new keys).
+  let model: string | null = null;
+  let probeError: string | null = null;
+  const candidates = (deep ? deepCandidates(models) : quickCandidates(models)).slice(0, 3);
+  if (MOCK) {
+    model = candidates[0] ?? DEFAULT_MODEL;
+  } else {
+    for (const candidate of candidates) {
+      const probe = await probeModel(geminiKey, candidate);
+      if (probe.ok) {
+        model = candidate;
+        break;
+      }
+      probeError = probe.error ?? null;
+    }
+    if (!model) {
+      return {
+        ok: false,
+        error: deep
+          ? `Deep scan pre-flight failed${probeError ? ` — ${probeError}` : ""}. Deep works best on a paid-tier key; quick hunt may still work.`
+          : `Gemini pre-flight failed${probeError ? ` — ${probeError}` : ""}. Check your key and quota, then retry.`,
+      };
+    }
   }
 
   const scanId = crypto.randomUUID();
@@ -163,6 +193,7 @@ async function runScan(scanId: string): Promise<void> {
     const totalChunks = getScan(scanId)?.totalChunks ?? pending.length;
     let filesScanned = getScan(scanId)?.coverage?.files_scanned ?? 0;
     let chunksFailed = 0;
+    let firstChunkError: string | null = null;
 
     for (const chunk of pending) {
       if (cancelled()) return;
@@ -215,13 +246,13 @@ async function runScan(scanId: string): Promise<void> {
       if (MOCK) {
         findings = mockFindings(numbered);
       } else {
-        await throttleGemini();
+        await throttleGemini(scan.mode === "deep" ? DEEP_MIN_INTERVAL_MS : GEMINI_MIN_INTERVAL_MS);
         const result = await callGeminiForFindings(
           geminiKey,
-          scan.model ?? "gemini-2.5-flash",
+          scan.model ?? DEFAULT_MODEL,
           prompt,
           FINDINGS_RESPONSE_SCHEMA,
-          scan.mode === "deep" ? { thinkingBudget: 8192 } : {},
+          scan.mode === "deep" ? { thinking: "high" } : {},
         );
         if (result.ok) {
           findings = result.findings;
@@ -237,6 +268,7 @@ async function runScan(scanId: string): Promise<void> {
 
       if (findings === null) {
         setChunkStatus(chunk.id, "failed", callError ?? "unknown error");
+        if (callError && !firstChunkError) firstChunkError = callError;
         chunksFailed++;
         advanceProgress(scanId);
         continue;
@@ -275,7 +307,11 @@ async function runScan(scanId: string): Promise<void> {
     const allFailed = chunksFailed > 0 && chunksFailed >= totalChunks;
     updateScan(scanId, {
       status: allFailed ? "failed" : "complete",
-      error: allFailed ? "Every chunk failed to scan. Check your Gemini key and quota." : chunksFailed > 0 ? `${chunksFailed} of ${totalChunks} chunks failed — partial results shown.` : null,
+      error: allFailed
+        ? `All ${totalChunks} chunks failed.${firstChunkError ? ` Gemini said: ${firstChunkError}` : " Check your Gemini key and quota."}`
+        : chunksFailed > 0
+          ? `${chunksFailed} of ${totalChunks} chunks failed — partial results shown.`
+          : null,
       finishedAt: new Date().toISOString(),
     });
   } catch (e) {

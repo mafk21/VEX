@@ -62,6 +62,13 @@ export function saveGemini(key: string, models: string[]): void {
   writeConfig(cfg);
 }
 
+/** Refresh just the cached Gemini model list (models churn fast — Google deprecates often). */
+export function saveGeminiModels(models: string[]): void {
+  const cfg = readConfig();
+  cfg.geminiModels = models;
+  writeConfig(cfg);
+}
+
 export function clearKey(kind: "github" | "gemini"): void {
   const cfg = readConfig();
   if (kind === "github") {

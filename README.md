@@ -85,8 +85,12 @@ with clearly-labeled sample findings. No API key or quota needed.
 That's the only permission VEX needs. (A classic PAT with the `repo` scope also works.)
 
 **2 · Gemini API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-→ **Create API key**. The free tier works (~1,500 requests/day; a hunt uses
-roughly one request per ~120K tokens of code).
+→ **Create API key**. The free tier works (~500 requests/day on Flash-Lite; a hunt
+uses roughly one request per ~120K tokens of code).
+
+> VEX discovers the models your key can actually call at the start of every hunt
+> and probes them before scanning — Google's model lineup changes fast, and VEX
+> adapts automatically instead of going stale.
 
 **3 · Hunt** — pick a repo on the dashboard → **⌖ hunt**. Watch live progress,
 then browse the report.
@@ -95,8 +99,8 @@ then browse the report.
 
 | Mode | Model | Best for |
 |---|---|---|
-| **⌖ hunt** (quick) | Gemini Flash, 1M-token context | Everyday scans; works on free keys |
-| **deep** | Gemini Pro + extended reasoning, smaller chunks | Thorough audits; needs a paid-tier key |
+| **⌖ hunt** (quick) | Gemini Flash-Lite (free tier: ~500 req/day) | Everyday scans; works on free keys |
+| **deep** | Strongest available model (e.g. Gemini 3.8 Flash) + high reasoning | Thorough audits; best on a paid-tier key (free tier is ~20 req/day here) |
 
 ## How it works
 
