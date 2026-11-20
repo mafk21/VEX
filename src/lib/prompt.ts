@@ -57,10 +57,12 @@ FILE INVENTORY:
 ${inventory.map((p) => `- ${p}`).join("\n")}
 
 WHAT TO HUNT:
-- security: injection (SQL/command/template), XSS, SSRF, authn/authz bypass, hardcoded secrets or keys, insecure crypto, unsafe deserialization, path traversal, CSRF/CORS mistakes, open redirects, missing rate limiting on sensitive endpoints
+- security: injection (SQL/command/template), XSS, SSRF, authn/authz bypass, IDOR / missing ownership checks on object access, mass assignment, JWT weaknesses (alg=none, weak secret, no expiry), hardcoded secrets or keys, insecure crypto, unsafe deserialization, path traversal, CSRF/CORS mistakes, open redirects, missing rate limiting on sensitive endpoints, prototype pollution, session/cookie misconfig (no HttpOnly/Secure)
 - bug: null/undefined dereferences, race conditions, unhandled promise rejections, missing error handling, resource leaks, off-by-one errors, wrong operator/typo-level mistakes, integer issues
 - logic: unreachable code, inverted or wrong conditionals, broken async/await flow, incorrect state transitions, early returns that skip cleanup, functions whose result is ignored when it matters
 - quality: only issues with real maintenance/correctness impact (dead exports, dangerous duplication, hidden coupling) — no style nitpicks
+
+PAY SPECIAL ATTENTION to state-changing handlers (POST/PUT/DELETE, payment, admin) that lack visible auth/authorization checks — the most common real-world break.
 
 RULES:
 1. Only report issues grounded in the code below. Never speculate about file contents you cannot see.
@@ -74,4 +76,26 @@ RULES:
 
 CODE:
 ${codeBlocks}`;
+}
+
+/** Verification prompt: re-examine one finding against its full file. */
+export function buildVerifyPrompt(args: {
+  repo: string;
+  path: string;
+  numbered: string;
+  finding: { severity: string; category: string; title: string; explanation: string };
+}): string {
+  const { repo, path, numbered, finding } = args;
+  return `You are VEX's verification pass. An automated audit of ${repo} produced the finding below. Re-examine it against the complete file and decide if it is real and correctly rated.
+
+FINDING:
+${JSON.stringify({ file: path, severity: finding.severity, category: finding.category, title: finding.title, explanation: finding.explanation }, null, 2)}
+
+FILE ${path}:
+${numbered}
+
+RULES:
+- If the finding is NOT a real issue (wrong, not exploitable, already mitigated in this file, or speculative): return exactly [].
+- If it IS real: return an array with exactly one refined finding for file "${path}" — accurate severity (do not inflate), honest confidence, corrected line_start/line_end, a sharper explanation (how it triggers, blast radius), and a concrete suggested_fix.
+- Output ONLY the JSON array matching the required schema.`;
 }

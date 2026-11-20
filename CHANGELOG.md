@@ -3,6 +3,28 @@
 All notable changes to VEX are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] — 2026-11-18
+
+### Added
+- **Deterministic pattern layer**: 19 regex rules for hardcoded secrets (AWS,
+  GitHub, Google, Slack tokens, private keys, JWTs, generic secret assignments)
+  and dangerous APIs (eval, SQL/shell interpolation, innerHTML, pickle/yaml
+  deserialization, weak crypto, wildcard CORS, debug mode). Runs locally with
+  zero quota cost and no hallucination risk — placeholder-aware, file-type
+  scoped, one finding per line max.
+- **Verification pass**: after each hunt, the strongest open findings (up to 10)
+  are re-examined against their full files. Real findings get refined severity,
+  sharper explanations and fixes (marked "✓ Verified"); unconfirmable ones get
+  deflated confidence and a skepticism warning. Best-effort: quota exhaustion
+  or errors never fail the hunt.
+
+### Changed
+- **Affinity chunk packing**: files are grouped by directory so related code is
+  analyzed together — attacks the cross-file blind spot of chunked analysis.
+- Sharper hunt prompt: IDOR/ownership checks, mass assignment, JWT weaknesses,
+  prototype pollution, session/cookie config, and special attention to
+  state-changing handlers missing authorization.
+
 ## [1.1.1] — 2026-11-18
 
 ### Fixed
