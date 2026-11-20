@@ -19,11 +19,20 @@ export interface ChunkPlan {
 }
 
 export function planChunks(files: SelectedFile[], budget = CHUNK_TOKEN_BUDGET): ChunkPlan[] {
+  // Affinity packing: group files by directory so related code (callers,
+  // callees, sibling modules) is analyzed in the same chunk — this attacks
+  // the cross-file blind spot of chunked analysis.
+  const sorted = [...files].sort((a, b) => {
+    const da = a.path.slice(0, Math.max(0, a.path.lastIndexOf("/")));
+    const db = b.path.slice(0, Math.max(0, b.path.lastIndexOf("/")));
+    return da.localeCompare(db) || a.path.localeCompare(b.path);
+  });
+
   const chunks: ChunkPlan[] = [];
   let current: SelectedFile[] = [];
   let currentTokens = 0;
 
-  for (const f of files) {
+  for (const f of sorted) {
     const t = estimateTokens(f.size) + 30; // + header/formatting overhead
     if (current.length > 0 && currentTokens + t > budget) {
       chunks.push({ idx: chunks.length, files: current, estTokens: currentTokens });

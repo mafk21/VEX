@@ -19,6 +19,8 @@ hunts the code for **bugs, vulnerabilities, logic-flow breaks, and quality
 issues**, then shows you exactly where each problem lives and how to fix it.
 
 - 🔍 **Whole-repo hunts** — smart file selection + token-budgeted chunking, grounded with real line numbers
+- 🔍 **Two-layer detection** — deterministic secret/dangerous-API patterns (free, zero false confidence) + LLM reasoning over token-budgeted chunks
+- ✓ **Verified findings** — a second pass re-examines top findings against full files: false positives deflated, real ones sharpened
 - ⚡ **Two modes** — quick hunts on a free Gemini key, or deep reasoning on paid tier
 - 📊 **A real report UI** — severity dashboard, filters, syntax-highlighted code context, GitHub deep-links
 - ✅ **A triage workflow** — mark findings confirmed / false positive / ignored, track progress, export carries your verdicts

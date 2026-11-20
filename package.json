@@ -1,6 +1,6 @@
 {
   "name": "vex",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "description": "VEX — local-first AI code hunter for your GitHub repos, powered by your own Gemini key.",
   "author": "mafk21 (https://github.com/mafk21)",

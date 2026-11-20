@@ -3,16 +3,17 @@ import { getGitHubToken, getGeminiKey, readConfig, saveGeminiModels } from "./co
 import {
   createScan, updateScan, getScan, insertChunks, getPendingChunks, setChunkStatus,
   resetRunningChunks, saveScanFile, getScanFileLines, insertFinding, getResumableScans,
-  getCachedRepo, getDb, type Coverage, type ChunkRow,
+  getCachedRepo, getDb, getFindings, getScanFile, updateFinding, type Coverage, type ChunkRow,
 } from "./db";
 import { fetchRepoTree, fetchFileContent } from "./repo-fetch";
 import { filterTree, MAX_FILE_BYTES } from "./filter";
-import { planChunks, CHUNK_TOKEN_BUDGET } from "./packer";
+import { planChunks, CHUNK_TOKEN_BUDGET, estimateTokens, numberLines } from "./packer";
 
 /** Deep scans reason harder over smaller chunks. */
 const DEEP_CHUNK_TOKEN_BUDGET = 60_000;
-import { buildScanPrompt, prepareFile, FINDINGS_RESPONSE_SCHEMA, type NumberedFile } from "./prompt";
+import { buildScanPrompt, buildVerifyPrompt, prepareFile, FINDINGS_RESPONSE_SCHEMA, type NumberedFile } from "./prompt";
 import { callGeminiForFindings, quickCandidates, deepCandidates, probeModel, validateGeminiKey, DEFAULT_MODEL, type RawFinding } from "./gemini";
+import { scanFileForPatterns } from "./patterns";
 
 /**
  * In-process scan worker. Because VEX runs locally (no serverless timeouts),
@@ -243,6 +244,7 @@ async function runScan(scanId: string): Promise<void> {
 
       // Fetch this chunk's file contents (bounded concurrency)
       const numbered: NumberedFile[] = [];
+      const raws: Array<{ path: string; content: string }> = [];
       for (let i = 0; i < fileSpecs.length; i += CONTENT_FETCH_CONCURRENCY) {
         if (cancelled()) return;
         const batch = fileSpecs.slice(i, i + CONTENT_FETCH_CONCURRENCY);
@@ -255,7 +257,26 @@ async function runScan(scanId: string): Promise<void> {
         for (const r of results) {
           if (!r) continue;
           numbered.push(r.prepared);
+          raws.push({ path: r.prepared.path, content: r.raw });
           saveScanFile(scanId, r.prepared.path, r.raw, r.prepared.lines);
+        }
+      }
+
+      // Deterministic pattern pass — runs locally, costs zero quota, and is
+      // already grounded, so findings go straight to the DB.
+      for (const r of raws) {
+        for (const p of scanFileForPatterns(r.path, r.content)) {
+          insertFinding(scanId, {
+            filePath: p.file,
+            lineStart: p.line_start,
+            lineEnd: p.line_end,
+            severity: p.severity,
+            category: p.category,
+            title: p.title,
+            explanation: p.explanation,
+            suggestedFix: p.suggested_fix,
+            confidence: p.confidence,
+          });
         }
       }
 
@@ -350,6 +371,13 @@ async function runScan(scanId: string): Promise<void> {
       if (cov) updateScan(scanId, { coverage: { ...cov, files_scanned: filesScanned } });
     }
 
+    // ── Verification pass: re-examine the strongest findings against their
+    // full files. Deflates false positives, sharpens real ones. Best-effort:
+    // it must never fail or block the hunt's completion.
+    if (!MOCK && !flag.cancel) {
+      await verifyTopFindings(scanId, geminiKey, currentModel, scan.mode === "deep", scan.repoFullName);
+    }
+
     // ── Done ───────────────────────────────────────────────────────────────
     const finalScan = getScan(scanId);
     if (!finalScan || finalScan.status === "cancelled") return;
@@ -377,6 +405,48 @@ async function runScan(scanId: string): Promise<void> {
 function advanceProgress(scanId: string): void {
   const s = getScan(scanId);
   if (s) updateScan(scanId, { doneChunks: s.doneChunks + 1 });
+}
+
+/* ── verification pass ───────────────────────────────────────────────────── */
+
+const VERIFY_LIMIT = 10;
+const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+
+async function verifyTopFindings(scanId: string, key: string, model: string, deep: boolean, repo: string): Promise<void> {
+  try {
+    const top = getFindings(scanId)
+      .filter((f) => f.status === "open")
+      .sort((a, b) => (SEV_RANK[a.severity] ?? 4) - (SEV_RANK[b.severity] ?? 4) || (b.confidence ?? 0) - (a.confidence ?? 0))
+      .slice(0, VERIFY_LIMIT);
+    for (const f of top) {
+      const file = getScanFile(scanId, f.filePath);
+      if (!file) continue;
+      const prompt = buildVerifyPrompt({ repo, path: f.filePath, numbered: numberLines(file.content).text, finding: f });
+      await throttleGemini(estimateTokens(file.content.length) + 2_000, deep ? DEEP_MIN_INTERVAL_MS : GEMINI_MIN_INTERVAL_MS);
+      const res = await callGeminiForFindings(key, model, prompt, FINDINGS_RESPONSE_SCHEMA, deep ? { thinking: "high" } : {});
+      if (!res.ok) {
+        if (res.quotaExhausted) break; // out of budget — remaining findings stand as-is
+        continue;
+      }
+      if (res.findings.length === 0) {
+        // Verifier found nothing real — deflate confidence and flag it
+        updateFinding(f.id, {
+          confidence: Math.round(((f.confidence ?? 0.8) * 0.5) * 100) / 100,
+          explanation: `⚠ Verification pass could not confirm this — treat with skepticism.\n\n${f.explanation}`,
+        });
+      } else {
+        const v = res.findings[0];
+        updateFinding(f.id, {
+          severity: v.severity,
+          confidence: v.confidence,
+          explanation: `✓ Verified by a second pass.\n\n${v.explanation}`,
+          suggestedFix: v.suggested_fix,
+        });
+      }
+    }
+  } catch {
+    /* verification is best-effort */
+  }
 }
 
 /** Flat list of every file selected for this scan (from all chunk rows). */

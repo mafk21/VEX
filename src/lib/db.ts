@@ -385,6 +385,22 @@ export function getFindings(scanId: string): Finding[] {
   }));
 }
 
+/** Patch fields of a finding (used by the verification pass). */
+export function updateFinding(
+  id: number,
+  patch: Partial<{ severity: string; explanation: string; suggestedFix: string | null; confidence: number | null }>,
+): void {
+  const sets: string[] = [];
+  const vals: Array<string | number | null> = [];
+  if (patch.severity !== undefined) { sets.push("severity = ?"); vals.push(patch.severity); }
+  if (patch.explanation !== undefined) { sets.push("explanation = ?"); vals.push(patch.explanation); }
+  if (patch.suggestedFix !== undefined) { sets.push("suggested_fix = ?"); vals.push(patch.suggestedFix); }
+  if (patch.confidence !== undefined) { sets.push("confidence = ?"); vals.push(patch.confidence); }
+  if (sets.length === 0) return;
+  vals.push(id);
+  getDb().prepare(`UPDATE findings SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+}
+
 /** Update a finding's triage status. Returns the updated finding or null. */
 export function setFindingStatus(id: number, status: string): Finding | null {
   if (!(FINDING_STATUSES as readonly string[]).includes(status)) return null;
